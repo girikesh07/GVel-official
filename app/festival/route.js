@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// Fallback Festival Data agar database connect na ho
+// Fallback Festival Data agar database offline ho
 const fallbackFestivals = [
   {
     id: "varanasi",
@@ -25,16 +25,10 @@ const fallbackFestivals = [
 
 export async function GET() {
   try {
-    // Agar live Supabase credentials nahi hain toh seedhe fallback dein
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
-      return NextResponse.json({ data: fallbackFestivals, success: true });
-    }
-
     const { data, error } = await supabase.from('festivals').select('*');
     if (error || !data || data.length === 0) {
       return NextResponse.json({ data: fallbackFestivals, success: true });
     }
-
     return NextResponse.json({ data, success: true });
   } catch (err) {
     return NextResponse.json({ data: fallbackFestivals, success: true });
