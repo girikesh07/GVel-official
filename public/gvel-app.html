@@ -1,0 +1,3560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GVel | India's Smart Travel & Route Network</title>
+  <link rel="icon" type="image/png" href="/gvel-logo-icon.png">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .insta-ring { background: linear-gradient(45deg, #10b981, #059669, #0d9488, #d97706); padding: 2.5px; }
+    .story-progress-bg { background: rgba(255, 255, 255, 0.35); height: 3px; border-radius: 2px; overflow: hidden; flex: 1; }
+    .story-progress-fill { background: #ffffff; height: 100%; width: 0%; transition: width 0.1s linear; }
+    #plannerMap { height: 280px; width: 100%; border-radius: 16px; z-index: 10; }
+    #directRouteMap { height: 300px; width: 100%; border-radius: 16px; z-index: 10; }
+    .gvel-wordmark { width: 100%; max-width: 240px; height: auto; object-fit: contain; }
+    .route-status { font-size: 12px; }
+    @media (min-width: 768px) { #plannerMap { height: 380px; } }
+  </style>
+
+  <script>
+    // Global Application State
+    window.currentUser = null;
+    window.savedPlaces = ["varanasi", "pushkar", "goa"];
+    window.activeTab = "home";
+    window.currentStoryIndex = 0;
+    window.storyTimer = null;
+    window.leafletMap = null;
+    window.currentMapMarkers = [];
+
+    window.plannerState = {
+      origin: "Delhi NCR",
+      destId: "varanasi",
+      budget: 3500,
+      transport: "walk"
+    };
+
+    // 22 Curated Indian Destinations
+    window.DESTINATIONS = [
+      { id: "varanasi", name: "Dev Deepawali (84 Ghats)", location: "Varanasi, Uttar Pradesh", tag: "Festival Special", tagColor: "bg-orange-500", budget: "₹3,500 - ₹6,500", image: "https://images.unsplash.com/photo-1571536802807-30451e3955d8?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800&auto=format&fit=crop&q=80", desc: "Over one million glowing earthen lamps across Assi, Dashashwamedh, and Manikarnika ghats with Grand Maha Aarti.", lat: 25.3176, lng: 82.9739 },
+      { id: "goa", name: "Goa Coastal Backpacking", location: "North & South Goa", tag: "Beaches & Forts", tagColor: "bg-indigo-600", budget: "₹4,500 - ₹9,500", image: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&auto=format&fit=crop&q=80", desc: "Arambol cliffs, Chapora Fort sunset panorama, cheap scooter rentals, and fresh coastal seafood shacks.", lat: 15.2993, lng: 74.1240 },
+      { id: "pushkar", name: "Pushkar Camel Fair", location: "Pushkar, Rajasthan", tag: "Iconic Culture", tagColor: "bg-amber-600", budget: "₹3,000 - ₹7,000", image: "78147.jpg", fallback: "https://images.unsplash.com/photo-1509744645300-a2098b11871a?w=800&auto=format&fit=crop&q=80", desc: "Colorfully adorned camel safaris, hot air balloon festivals, and vibrant Thar desert camp vibes.", lat: 26.4897, lng: 74.5511 },
+      { id: "bundi", name: "Bundi Fort & Stepwells", location: "Hadoti Circuit, Rajasthan", tag: "Heritage Gem", tagColor: "bg-emerald-600", budget: "₹2,500 - ₹5,000", image: "78146.jpg", fallback: "https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=800&auto=format&fit=crop&q=80", desc: "Taragarh Fort ramparts, cobalt-blue painted historic alleys, folk musicians, and ornate stepwells.", lat: 25.4415, lng: 75.6441 },
+      { id: "chhath", name: "Chhath Puja Mahaparv", location: "Patna & Bodh Gaya, Bihar", tag: "Festival Special", tagColor: "bg-amber-500", budget: "₹2,000 - ₹4,500", image: "78144.jpg", fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800&auto=format&fit=crop&q=80", desc: "Holy arghya rituals on sacred Ganga ghats with direct Sampoorna Kranti Express connectivity.", lat: 25.5941, lng: 85.1376 },
+      { id: "hornbill", name: "Hornbill Tribal Festival", location: "Kisama Heritage, Nagaland", tag: "Tribal Festival", tagColor: "bg-purple-600", budget: "₹8,000 - ₹15,000", image: "78145.jpg", fallback: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&auto=format&fit=crop&q=80", desc: "Festival of festivals showcasing 16 indigenous tribes of Nagaland with authentic feasts.", lat: 25.6751, lng: 94.1086 },
+      { id: "spiti", name: "Spiti Valley Cold Desert", location: "Himachal Pradesh", tag: "Adventure Roadtrip", tagColor: "bg-blue-600", budget: "₹8,000 - ₹14,000", image: "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?w=800&auto=format&fit=crop&q=80", desc: "Key Monastery, world's highest post office at Hikkim, and dramatic cliff trails.", lat: 32.2461, lng: 78.0349 },
+      { id: "leh", name: "Leh Ladakh Pass Circuit", location: "Ladakh UT", tag: "High Altitude", tagColor: "bg-cyan-600", budget: "₹9,000 - ₹18,000", image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?w=800&auto=format&fit=crop&q=80", desc: "Pangong Tso blue waters, Khardung La 17,982ft mountain pass, and ancient Thiksey Gompa.", lat: 34.1526, lng: 77.5771 },
+      { id: "rishikesh", name: "Rishikesh Yoga & Rafting", location: "Uttarakhand", tag: "River & Spiritual", tagColor: "bg-teal-600", budget: "₹2,800 - ₹5,500", image: "https://images.unsplash.com/photo-1598890777032-bde13fbe3497?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1598890777032-bde13fbe3497?w=800&auto=format&fit=crop&q=80", desc: "White-water Ganga river rafting, Beatles Ashram murals, and evening Parmarth Niketan Aarti.", lat: 30.0869, lng: 78.2676 },
+      { id: "hampi", name: "Hampi Boulder Ruins", location: "Karnataka", tag: "UNESCO Heritage", tagColor: "bg-amber-700", budget: "₹3,200 - ₹6,000", image: "https://images.unsplash.com/photo-1600100397608-f010e4210d32?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1600100397608-f010e4210d32?w=800&auto=format&fit=crop&q=80", desc: "Vijayanagara empire stone chariot, Virupaksha temple, and scenic Sanapur lake.", lat: 15.3350, lng: 76.4600 },
+      { id: "jaisalmer", name: "Jaisalmer Golden Fort", location: "Thar Desert, Rajasthan", tag: "Living Fort", tagColor: "bg-yellow-600", budget: "₹3,500 - ₹7,000", image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800&auto=format&fit=crop&q=80", desc: "India's only living medieval sandstone fort where thousands of families reside inside ancient ramparts.", lat: 26.9157, lng: 70.9083 },
+      { id: "manali", name: "Old Manali & Solang", location: "Himachal Pradesh", tag: "Mountains", tagColor: "bg-emerald-700", budget: "₹3,500 - ₹7,500", image: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&auto=format&fit=crop&q=80", desc: "Pine forests, apple orchards, mountain river bridges, and riverside cafes.", lat: 32.2432, lng: 77.1892 }
+    ];
+      // Supabase Live Data Connection
+fetch('/festival')
+  .then(res => res.json())
+  .then(res => {
+    if ( res.data && res.data.length > 0) {
+      window.DESTINATIONS = res.data.map(item => ({
+        id: item.id,
+        name: item.title || item.name || "Special Destination",
+        location: item.location || "India",
+        tag: item.date_window || "Festival Special",
+        tagColor: "bg-orange-500",
+        budget: "₹3,500 - ₹7,000",
+        category: "Festival & Culture",
+        desc: item.location || "",
+        image: item.image_url || "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=600"
+      }));
+
+      if (typeof window.renderFeed === 'function') window.renderFeed();
+      if (typeof window.renderPlannerCityGrid === 'function') window.renderPlannerCityGrid();
+    }
+  })
+  .catch(err => console.error("Supabase load error:", err));
+      // Supabase Live Data Connection
+fetch('/festival')
+  .then(res => res.json())
+  .then(res => {
+    if (res.success && res.data && res.data.length > 0) {
+      window.DESTINATIONS = res.data.map(item => ({
+        id: item.id,
+        name: item.title || item.name || "Special Destination",
+        location: item.location || "India",
+        tag: item.date_window || "Festival Special",
+        tagColor: "bg-orange-500",
+        budget: "₹3,500 - ₹7,000",
+        category: "Festival & Culture",
+        desc: item.location || "",
+        image: item.image_url || "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=600"
+      }));
+
+      // Live Cards Refresh
+      if (typeof window.renderFeed === 'function') window.renderFeed();
+      if (typeof window.renderPlannerCityGrid === 'function') window.renderPlannerCityGrid();
+    }
+  })
+  .catch(err => console.error("Supabase load error:", err));
+    // Guest Bypass
+    window.bypassAuthAsGuest = function() {
+      window.currentUser = { name: "Guest Traveler", contact: "Guest Mode" };
+      document.getElementById('authScreen').classList.add('hidden');
+      window.renderFeed();
+      window.renderPlannerCityGrid();
+      window.updateSavedCountBadge();
+    };
+
+    window.switchAuthMode = function(mode) {
+      const loginTab = document.getElementById('authTabLogin');
+      const signupTab = document.getElementById('authTabSignup');
+      const submitBtn = document.getElementById('authSubmitBtn');
+      if (mode === 'signup') {
+        signupTab.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700";
+        loginTab.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+        submitBtn.innerText = "CREATE GVEL ACCOUNT";
+      } else {
+        loginTab.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700";
+        signupTab.className = "flex-1 pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+        submitBtn.innerText = "LOG IN TO GVEL";
+      }
+    };
+
+    window.toggleAuthInput = function(type) {
+      document.getElementById('phoneInputGroup').classList.toggle('hidden', type === 'email');
+      document.getElementById('emailInputGroup').classList.toggle('hidden', type !== 'email');
+    };
+
+    window.handleAuthSubmit = function() {
+      const p = document.getElementById('authPhone').value || "9876543210";
+      const c = document.getElementById('countryCodeSelect').value || "+91";
+      window.currentUser = { name: "Deepak (Explorer)", contact: c + " " + p };
+      document.getElementById('drawerUserName').innerText = window.currentUser.name;
+      document.getElementById('drawerUserContact').innerText = window.currentUser.contact;
+      document.getElementById('authScreen').classList.add('hidden');
+      window.renderFeed();
+      window.renderPlannerCityGrid();
+      window.updateSavedCountBadge();
+    };
+
+    window.logoutUser = function() {
+      window.currentUser = null;
+      document.getElementById('profileDrawer').classList.add('hidden');
+      document.getElementById('authScreen').classList.remove('hidden');
+    };
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900 pb-20 md:pb-10">
+
+  <!-- ========================================== -->
+  <!-- 1. AUTHENTICATION POPUP                    -->
+  <!-- ========================================== -->
+  <div id="authScreen" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col justify-center items-center p-4 overflow-y-auto">
+    <div class="w-full max-w-sm sm:max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto">
+      <div class="text-center mb-6">
+        <div class="inline-block relative mb-3">
+          <img src="/gvel-logo-icon.png" alt="GVel mountain traveller logo" class="w-20 h-20 rounded-3xl object-cover shadow-xl border-2 border-amber-300 mx-auto">
+        </div>
+        <img src="/gvel-wordmark.png" alt="GVel — Every journey, one world" class="gvel-wordmark mx-auto">
+        <p class="text-xs font-semibold text-slate-500 tracking-wide uppercase mt-1">India's Smart Travel Network</p>
+      </div>
+
+      <div class="flex border-b border-slate-200 mb-5">
+        <button type="button" id="authTabLogin" onclick="window.switchAuthMode('login')" class="flex-1 pb-3 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700">Log In</button>
+        <button type="button" id="authTabSignup" onclick="window.switchAuthMode('signup')" class="flex-1 pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600">Create Account</button>
+      </div>
+
+      <div class="flex justify-center gap-6 mb-4 text-xs font-semibold text-slate-500">
+        <label class="flex items-center gap-1.5 cursor-pointer text-emerald-700 font-bold">
+          <input type="radio" name="authMethod" checked onchange="window.toggleAuthInput('phone')" class="accent-emerald-600"> Mobile Number
+        </label>
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="radio" name="authMethod" onchange="window.toggleAuthInput('email')" class="accent-emerald-600"> Email Address
+        </label>
+      </div>
+
+      <div id="phoneInputGroup" class="mb-4">
+        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Mobile Number</label>
+        <div class="flex gap-2">
+          <select id="countryCodeSelect" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500">
+            <option value="+91">IN +91</option>
+            <option value="+977">NP +977</option>
+            <option value="+971">UAE +971</option>
+            <option value="+1">US +1</option>
+          </select>
+          <input type="tel" id="authPhone" placeholder="98765 43210" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white" value="9876543210">
+        </div>
+      </div>
+
+      <div id="emailInputGroup" class="mb-4 hidden">
+        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Email Address</label>
+        <input type="email" id="authEmail" placeholder="deepak@gvel.in" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white">
+      </div>
+
+      <div class="mb-5">
+        <div class="flex justify-between items-center mb-1">
+          <label class="block text-[11px] font-bold uppercase text-slate-500">Password</label>
+          <a href="javascript:void(0)" onclick="alert('Password reset link sent!')" class="text-[11px] font-semibold text-emerald-600 hover:underline">Forgot?</a>
+        </div>
+        <input type="password" id="authPass" placeholder="••••••••" value="gvel2026" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white">
+      </div>
+
+      <button type="button" onclick="window.handleAuthSubmit()" id="authSubmitBtn" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl shadow-md active:scale-98 transition text-sm">
+        LOG IN TO GVEL
+      </button>
+
+      <div class="relative my-4">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+        <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400 font-bold tracking-wider">OR</span></div>
+      </div>
+
+      <button type="button" onclick="window.bypassAuthAsGuest()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded-xl active:scale-98 transition text-xs flex items-center justify-center gap-2">
+        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i> Guest Quick Access (Direct Entry)
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 2. STICKY TOP APP HEADER                   -->
+  <!-- ========================================== -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 shadow-xs">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="window.switchTab('home')">
+        <img src="/gvel-logo-icon.png" alt="GVel logo" class="w-10 h-10 rounded-xl object-cover shadow-sm border border-amber-300">
+        <img src="/gvel-wordmark.png" alt="GVel" class="w-24 sm:w-28 h-auto object-contain">
+      </div>
+
+      <nav class="hidden md:flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 text-xs font-bold">
+        <button type="button" onclick="window.switchTab('home')" id="dNavHome" class="px-4 py-2 rounded-xl bg-white text-emerald-700 shadow-xs flex items-center gap-1.5">
+          <i data-lucide="home" class="w-4 h-4"></i> Home Feed
+        </button>
+        <button type="button" onclick="window.switchTab('budget')" id="dNavBudget" class="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i data-lucide="ticket" class="w-4 h-4"></i> Booking Links
+        </button>
+       <button type="button" onclick="window.switchTab('shopping')" id="dNavShopping" class="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 flex items-center gap-2">
+  <i data-lucide="shopping-bag" class="w-4 h-4"></i> Travel Gear
+        </button>
+        <button type="button" onclick="window.switchTab('planner')" id="dNavPlanner" class="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i data-lucide="map" class="w-4 h-4"></i> Trip Planner
+        </button>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="window.openSavedDrawer()" class="relative p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition flex items-center gap-1.5 font-bold text-xs">
+          <i data-lucide="bookmark" class="w-5 h-5 text-slate-800"></i>
+          <span class="hidden sm:inline">Saved</span>
+          <span id="savedCountBadge" class="bg-emerald-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">3</span>
+        </button>
+        <button type="button" onclick="document.getElementById('profileDrawer').classList.remove('hidden')" class="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition">
+          <i data-lucide="more-vertical" class="w-5 h-5 text-slate-800"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- 3. MAIN APP SCREENS                        -->
+  <!-- ========================================== -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
+
+    <!-- TAB 1: HOME PAGE -->
+    <div id="tabHome" class="space-y-6">
+      
+      <!-- Story Carousel -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-4 shadow-xs">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <span class="text-xs font-black uppercase tracking-wider text-slate-400">Featured Stories & Expeditions</span>
+          <span class="text-xs font-bold text-emerald-600">Tap to watch story</span>
+        </div>
+        <div id="featuredStoriesCarousel" class="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar py-1">
+          <div onclick="window.openStory(0)" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+              <img src="https://images.unsplash.com/photo-1571536802807-30451e3955d8?w=200&auto=format&fit=crop&q=80" class="w-full h-full rounded-full object-cover border-2 border-white">
+            </div>
+            <span class="text-xs font-bold text-slate-700 mt-2">Dev Diwali</span>
+          </div>
+          <div onclick="window.openStory(1)" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+              <img src="78147.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1509744645300-a2098b11871a?w=200&auto=format&fit=crop&q=80';" class="w-full h-full rounded-full object-cover border-2 border-white">
+            </div>
+            <span class="text-xs font-bold text-slate-700 mt-2">Pushkar Mela</span>
+          </div>
+          <div onclick="window.openStory(2)" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+              <img src="78146.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=200&auto=format&fit=crop&q=80';" class="w-full h-full rounded-full object-cover border-2 border-white">
+            </div>
+            <span class="text-xs font-bold text-slate-700 mt-2">Bundi Fort</span>
+          </div>
+          <div onclick="window.openStory(3)" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+              <img src="78144.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=200&auto=format&fit=crop&q=80';" class="w-full h-full rounded-full object-cover border-2 border-white">
+            </div>
+            <span class="text-xs font-bold text-slate-700 mt-2">Chhath Puja</span>
+          </div>
+          <div onclick="window.openStory(4)" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+              <img src="78145.jpg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=200&auto=format&fit=crop&q=80';" class="w-full h-full rounded-full object-cover border-2 border-white">
+            </div>
+            <span class="text-xs font-bold text-slate-700 mt-2">Hornbill</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trust Banner & Search -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 bg-gradient-to-br from-emerald-50 via-teal-50 to-white border border-emerald-100 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs">
+          <div>
+            <div class="inline-flex items-center gap-2 mb-3">
+              <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-xs tracking-wide">100% DIRECT BOOKINGS</span>
+              <span class="text-xs font-bold text-emerald-950">Zero Agent Commissions</span>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">Explore Authentic India, <span class="text-emerald-600">On Your Budget.</span></h3>
+            <p class="text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">Direct train connections, verified highway dhabas, budget hostel stays, and direct booking links without any middlemen.</p>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-6 pt-4 border-t border-emerald-200/60 text-center">
+            <div><div class="text-lg sm:text-xl font-black text-slate-900">4.9 ★</div><div class="text-xs font-semibold text-slate-500">Play Store</div></div>
+            <div><div class="text-lg sm:text-xl font-black text-emerald-600">50,000+</div><div class="text-xs font-semibold text-slate-500">Routes</div></div>
+            <div><div class="text-lg sm:text-xl font-black text-teal-600">₹0 Fee</div><div class="text-xs font-semibold text-slate-500">Direct Links</div></div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 flex flex-col justify-between shadow-xs">
+          <div>
+            <h4 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">Instant Destination Search</h4>
+            <p class="text-xs text-slate-500 mb-4">Quickly filter any Indian city, cultural festival, or landmark.</p>
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-4 top-3.5 w-4 h-4 text-slate-400"></i>
+              <input type="text" id="destinationSearch" onkeyup="window.filterDestinations()" placeholder="Search Pushkar, Spiti, Goa, Hampi..." class="w-full bg-slate-100 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-semibold outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition">
+            </div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+            <span>Showing Destinations:</span>
+            <span id="feedCount" class="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">12 places</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- WHERE TO START & WHERE TO GO ROUTE ENGINE -->
+      <div class="bg-white border border-emerald-200 rounded-3xl p-5 sm:p-7 shadow-sm">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            <i data-lucide="navigation" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h4 class="text-base font-black text-slate-900">Plan Direct Travel Route</h4>
+            <p class="text-xs text-slate-500">Enter your departure city and destination to instantly configure your trip</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
+          <div class="md:col-span-2 relative">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Where to start (From)</label>
+            <div class="relative">
+              <i data-lucide="map-pin" class="absolute left-3.5 top-3.5 w-4 h-4 text-emerald-600"></i>
+              <input type="text" id="routeFromInput" value="Delhi NCR" placeholder="e.g. Delhi, Gurugram, Jaipur..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 transition">
+            </div>
+          </div>
+
+          <div class="flex justify-center md:pt-4">
+            <button type="button" onclick="window.swapRouteCities()" class="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 flex items-center justify-center border border-slate-200 transition active:scale-95 shadow-xs" title="Swap From and To">
+              <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="md:col-span-2 relative">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Where to go (To)</label>
+            <div class="relative">
+              <i data-lucide="compass" class="absolute left-3.5 top-3.5 w-4 h-4 text-emerald-600"></i>
+              <input type="text" id="routeToInput" value="Goa" placeholder="e.g. Goa, Varanasi, Pushkar..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 transition">
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Direct rail schedules, verified highway dhabas & stays ready.
+          </div>
+          <button type="button" onclick="window.planDirectRoute()" class="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+            <span>FIND ROUTE & PLAN TRIP</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- COMPACT HIGHWAY ROUTE CAPSULE (NO HEAVY MAP)                 -->
+      <!-- ============================================================ -->
+      <section id="routeResultsPanel" class="hidden bg-white border border-emerald-200 rounded-3xl p-5 sm:p-6 shadow-sm transition space-y-4">
+        
+        <!-- Header with Live Route Tag -->
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h4 class="text-sm sm:text-base font-black text-slate-900">Calculated Route Snapshot</h4>
+          </div>
+          <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
+            Verified Highway Corridor
+          </span>
+        </div>
+
+        <!-- Sleek Visual Journey Line (Origin to Destination) -->
+        <div class="bg-gradient-to-r from-slate-50 via-emerald-50/40 to-slate-50 border border-slate-200 rounded-2xl p-4">
+          <div class="flex items-center justify-between gap-2">
+            
+            <!-- Origin -->
+            <div class="text-left">
+              <span class="text-[10px] font-bold uppercase text-slate-400 block">Departure</span>
+              <h5 class="text-xs sm:text-sm font-black text-slate-900" id="routeDisplayOrigin">Delhi NCR</h5>
+            </div>
+
+            <!-- Route Track Arrow -->
+            <div class="flex-1 px-3 flex flex-col items-center">
+              <span class="text-[11px] font-black text-emerald-700" id="routeDisplayDistance">1,717 km</span>
+              <div class="w-full flex items-center gap-1 my-1">
+                <div class="w-2 h-2 rounded-full bg-emerald-600"></div>
+                <div class="h-0.5 flex-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 border-t border-dashed border-emerald-400"></div>
+                <i data-lucide="navigation" class="w-3.5 h-3.5 text-emerald-600 rotate-90"></i>
+              </div>
+              <span class="text-[10px] font-bold text-slate-500" id="routeDisplayTime">20h 36m driving</span>
+            </div>
+
+            <!-- Destination -->
+            <div class="text-right">
+              <span class="text-[10px] font-bold uppercase text-emerald-600 block">Destination</span>
+              <h5 class="text-xs sm:text-sm font-black text-slate-900" id="routeDisplayDest">Goa</h5>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 3 Horizontal Mini Intel Pills -->
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Distance</span>
+            <span class="text-xs font-black text-slate-800" id="routeChipDistance">-- km</span>
+          </div>
+          <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Est. Drive</span>
+            <span class="text-xs font-black text-slate-800" id="routeChipTime">-- hrs</span>
+          </div>
+          <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Highway</span>
+            <span class="text-xs font-black text-emerald-700">National Corridor</span>
+          </div>
+        </div>
+
+        <!-- Action CTAs: Direct Google Maps & Trip Planner -->
+        <div class="pt-1 flex flex-col sm:flex-row items-center gap-2.5">
+          <!-- 1. 100% Free Google Maps Turn-by-Turn Live Navigation -->
+          <a 
+            id="openGoogleRoute" 
+            href="https://www.google.com/maps/dir/?api=1" 
+            target="_blank" 
+            rel="noreferrer" 
+            class="w-full sm:flex-1 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+          >
+            <i data-lucide="navigation" class="w-4 h-4"></i>
+            <span>Start Turn-by-Turn on Google Maps 🗺️</span>
+          </a>
+
+          <!-- 2. Transfer directly into Trip Planner -->
+          <button 
+            type="button" 
+            onclick="window.transferRouteToPlanner()" 
+            class="w-full sm:flex-1 py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
+            <span>Plan Hotels & Stays in Planner 🚀</span>
+          </button>
+        </div>
+
+      </section>
+           <!-- ============================================================ -->
+      <!-- INTERACTIVE 2D FESTIVAL CALENDAR & SPOTLIGHT                 -->
+      <!-- ============================================================ -->
+      <section class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-sm space-y-5">
+        
+        <!-- Header with Month Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h4 class="text-lg font-black text-slate-900">Cultural Festival Calendar</h4>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Tap on highlighted green dates to uncover India's grandest spectacles</p>
+          </div>
+
+          <!-- Month Selector Pills -->
+          <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 self-start sm:self-auto">
+            <button type="button" onclick="window.changeCalendarMonth(-1)" class="w-8 h-8 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center font-black transition active:scale-95 shadow-xs">‹</button>
+            <span id="calCurrentMonthLabel" class="text-xs font-black text-slate-800 px-3 min-w-[110px] text-center">November 2026</span>
+            <button type="button" onclick="window.changeCalendarMonth(1)" class="w-8 h-8 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center font-black transition active:scale-95 shadow-xs">›</button>
+          </div>
+        </div>
+
+        <!-- 2D Month Grid -->
+        <div class="max-w-2xl mx-auto">
+          <!-- Day of week headers -->
+          <div class="grid grid-cols-7 text-center text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+
+          <!-- 2D Date Cells Grid -->
+          <div id="calendarDatesGrid" class="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
+            <!-- JavaScript will auto-render 1 to 30 days with glowing green highlights here -->
+          </div>
+        </div>
+
+        <!-- Active Festival Quick Banner (Below Calendar) -->
+        <div id="calActiveFestivalBanner" class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+              <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800" id="quickBannerTag">Featured Festival</span>
+              <h5 class="text-sm font-black text-slate-900" id="quickBannerTitle">Dev Deepawali (84 Ghats of Kashi)</h5>
+            </div>
+          </div>
+          <button type="button" onclick="window.openFestivalSpotlightModal(window.currentSelectedEventId || 'varanasi')" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm">
+            <span>View Spotlight Story</span>
+            <span>↗</span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- FESTIVAL SPOTLIGHT MODAL (CATCHY SUMMARY POPUP)             -->
+      <!-- ============================================================ -->
+      <div id="festivalSpotlightModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl my-auto animate-in fade-in zoom-in duration-200">
+          
+          <!-- Image Header with Gradient Overlay -->
+          <div class="relative h-48 sm:h-56 w-full bg-slate-900 overflow-hidden">
+            <img id="spotlightModalImg" src="" alt="Festival" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent"></div>
+            
+            <!-- Close Button -->
+            <button type="button" onclick="window.closeFestivalSpotlightModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center font-black hover:bg-black/70 transition">
+              ✕
+            </button>
+
+            <!-- Badges -->
+            <div class="absolute bottom-3 left-4 right-4 text-white">
+              <div class="flex items-center gap-2 mb-1">
+                <span id="spotlightModalTag" class="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">Festival Special</span>
+                <span id="spotlightModalDate" class="text-xs font-bold text-amber-300">24 November 2026</span>
+              </div>
+              <h3 id="spotlightModalTitle" class="text-xl sm:text-2xl font-black">Dev Deepawali Mahotsav</h3>
+              <p id="spotlightModalLocation" class="text-xs text-slate-200 flex items-center gap-1 mt-0.5">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-400"></i> Varanasi, Uttar Pradesh
+              </p>
+            </div>
+          </div>
+
+          <!-- Content Body -->
+          <div class="p-5 sm:p-6 space-y-4">
+            
+            <!-- Catchy Summary Pitch -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+              <h5 class="text-xs font-black uppercase tracking-wider text-slate-500 mb-1">Why You Can't Miss This</h5>
+              <p id="spotlightModalPitch" class="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                Over 1 million glowing earthen diyas illuminate all 84 crescent ghats along the Ganga. Legend says gods descend from the heavens to celebrate victory of good over evil. Witness the mega Maha Aarti at Dashashwamedh Ghat from traditional wooden boats.
+              </p>
+            </div>
+
+            <!-- Key Intel Chips -->
+            <div class="grid grid-cols-2 gap-2 text-left">
+              <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                <span class="block text-[10px] font-bold uppercase text-emerald-800">Best Experience</span>
+                <span id="spotlightModalBestTime" class="text-xs font-black text-slate-800">Evening River Boat at 5:30 PM</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100">
+                <span class="block text-[10px] font-bold uppercase text-amber-800">Estimated Budget</span>
+                <span id="spotlightModalBudget" class="text-xs font-black text-slate-800">₹3,500 - ₹6,500</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons: Jump to Feed or Plan Trip -->
+            <div class="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+              <button type="button" onclick="window.spotlightJumpToFeed()" class="w-full sm:flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5">
+                <i data-lucide="compass" class="w-4 h-4 text-emerald-600"></i>
+                <span>Explore in Feed</span>
+              </button>
+
+              <button type="button" onclick="window.spotlightStartPlanner()" class="w-full sm:flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-1.5">
+                <span>PLAN THIS TRIP NOW 🚀</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Grid -->
+      <div>
+        <div class="flex items-center justify-between mb-4 px-1">
+          <h4 class="text-lg font-black text-slate-900 flex items-center gap-2">
+            <i data-lucide="compass" class="w-5 h-5 text-emerald-600"></i> Explore 20+ Cultural Circuits
+          </h4>
+        </div>
+        <div id="destinationsFeedList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+      </div>
+
+    </div>
+
+    <!-- TAB 2: GVEL TRAVEL HUB -->
+    <!-- ============================================================ -->
+    <!-- TAB 2: SMART BOOKING HUB & FARE COMPARISON                   -->
+    <!-- ============================================================ -->
+    <div id="tabBudget" class="tab-content hidden space-y-6 pb-24">
+      
+      <!-- 1. Top Smart Search Form -->
+      <section class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-sm space-y-4">
+        
+        <div class="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h2 class="text-lg sm:text-xl font-black text-slate-900">🌍 GVel Direct Booking Hub</h2>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Compare live fares across official travel portals with 0% extra commission</p>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black self-start sm:self-auto border border-emerald-200">
+            100% Direct Portal Redirects
+          </span>
+        </div>
+
+        <!-- From, Destination & Journey Date Form -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <!-- From -->
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Departure City (From)</label>
+            <div class="relative">
+              <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input 
+                id="gvelFrom" 
+                type="text" 
+                value="Delhi NCR" 
+                placeholder="e.g. Ballia, Patna, Delhi..." 
+                class="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Destination -->
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Destination (To)</label>
+            <div class="relative">
+              <i data-lucide="compass" class="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input 
+                id="gvelTo" 
+                type="text" 
+                value="Varanasi" 
+                placeholder="e.g. Chandigarh, Goa, Jaipur..." 
+                class="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 transition"
+              />
+            </div>
+          </div>
+
+          <!-- Journey Date -->
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Journey Date</label>
+            <div class="relative">
+              <input 
+                id="gvelDate" 
+                type="date" 
+                class="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 transition"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- THE MISSING ACTION BUTTON: COMPARE FARES & BOOKINGS -->
+        <div class="pt-2">
+          <button 
+            type="button" 
+            onclick="window.searchAllProviders()" 
+            class="w-full py-3.5 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md active:scale-98 transition flex items-center justify-center gap-2"
+          >
+            <i data-lucide="search" class="w-4 h-4"></i>
+            <span id="bookingSearchBtnText">COMPARE ALL FARES & AVAILABILITY 🚀</span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- 2. Clean Category Pills (No 'All' Button) -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-black text-slate-900 uppercase tracking-wider">Choose Booking Category</span>
+          <span id="activeCategoryHint" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md">Showing Trains</span>
+        </div>
+
+        <!-- 6 Clean Categories -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="bookingCategoryBar">
+          
+          <!-- Category 1: Train -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('train')" 
+            id="bookCatBtn-train" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-slate-900 text-white shadow-sm"
+          >
+            <span>🚆 Trains (IRCTC)</span>
+          </button>
+
+          <!-- Category 2: Flight -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('flight')" 
+            id="bookCatBtn-flight" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+          >
+            <span>✈️ Flights</span>
+          </button>
+
+          <!-- Category 3: Bus -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('bus')" 
+            id="bookCatBtn-bus" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+          >
+            <span>🚌 Buses (Volvo)</span>
+          </button>
+
+          <!-- Category 4: Cab -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('cab')" 
+            id="bookCatBtn-cab" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+          >
+            <span>🚕 Cabs & Rentals</span>
+          </button>
+
+          <!-- Category 5: Hotel -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('hotel')" 
+            id="bookCatBtn-hotel" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+          >
+            <span>🏨 Hotels & Stays</span>
+          </button>
+
+          <!-- Category 6: Restaurant & Station Food -->
+          <button 
+            type="button" 
+            onclick="window.setBookingCategory('food')" 
+            id="bookCatBtn-food" 
+            class="booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+          >
+            <span>🍲 Food & Restaurants</span>
+          </button>
+
+        </div>
+      </section>
+
+      <!-- 3. Dynamic Comparison Cards Grid -->
+      <section>
+        <div id="bookingCardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <!-- Populated dynamically via JavaScript with Smart Route Links -->
+        </div>
+      </section>
+
+    </div>
+
+
+<!-- TAB 3: TRAVEL GEAR -->
+<!-- ===================================================================== -->
+<!-- TAB 3: TRAVEL GEAR (FLIPKART-STYLE TRAVEL STORE & DASHBOARD)         -->
+<!-- ===================================================================== -->
+<!-- Paste this replacing your old <div id="tabWeather" ...> or <div id="tabShopping" ...> -->
+
+<div id="tabShopping" class="space-y-5 hidden pb-24">
+
+  <!-- 1. TOP HERO BANNER & SEARCH BAR (FLIPKART TRAVEL STYLE) -->
+  <div class="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-5 sm:p-7 text-white shadow-lg space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 rounded-full text-[10px] font-black uppercase tracking-wider text-emerald-300">
+          <i data-lucide="shopping-bag" class="w-3.5 h-3.5"></i>
+          <span>GVel Verified Travel Gear Shop</span>
+        </div>
+        <h2 class="text-xl sm:text-2xl font-black mt-2 text-white">Essentials For Every Journey</h2>
+        <p class="text-xs text-emerald-100/80 mt-1">Curated road trip tools, waterproof rucksacks, camping kits & tech gadgets</p>
+      </div>
+
+      <!-- Trust Badge -->
+      <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 shrink-0">
+        <div class="w-8 h-8 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center font-black">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <span class="block text-[10px] text-emerald-200 uppercase font-black tracking-wider">Direct Deals</span>
+          <span class="text-xs font-black text-white">Lowest Price Guarantee</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Search Bar (Flipkart Search Input) -->
+    <div class="relative">
+      <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
+      <input 
+        type="text" 
+        id="gearSearchInput" 
+        oninput="window.filterGearItems()" 
+        placeholder="Search rucksack, tyre inflator, power bank, first aid kit, tent..." 
+        class="w-full pl-11 pr-24 py-3 bg-white text-slate-900 text-xs sm:text-sm font-medium rounded-2xl shadow-md border-0 focus:ring-2 focus:ring-emerald-400 focus:outline-none transition placeholder:text-slate-400"
+      />
+      <button 
+        type="button" 
+        onclick="window.clearGearSearch()" 
+        id="gearSearchClearBtn" 
+        class="hidden absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. FLIPKART-STYLE CATEGORY CHIPS (HORIZONTAL SCROLLING ICONS) -->
+  <div class="space-y-2">
+    <div class="flex items-center justify-between px-1">
+      <span class="text-xs font-black text-slate-900 uppercase tracking-wider">Browse by Category</span>
+      <span id="gearResultsCount" class="text-[11px] font-bold text-slate-500">Showing 8 Items</span>
+    </div>
+
+    <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="gearCategoryBar">
+      
+      <!-- Category 1: All -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('all')" 
+        id="gearCatBtn-all" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-slate-900 text-white shadow-sm"
+      >
+        <i data-lucide="layout-grid" class="w-4 h-4"></i>
+        <span>All Gear</span>
+      </button>
+
+      <!-- Category 2: Bags & Rucksacks -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('bags')" 
+        id="gearCatBtn-bags" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700"
+      >
+        <i data-lucide="backpack" class="w-4 h-4 text-emerald-600"></i>
+        <span>Bags & Luggage</span>
+      </button>
+
+      <!-- Category 3: Car & Bike Road Trip -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('vehicle')" 
+        id="gearCatBtn-vehicle" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-amber-500 hover:text-amber-700"
+      >
+        <i data-lucide="gauge" class="w-4 h-4 text-amber-600"></i>
+        <span>Car & Bike Tools</span>
+      </button>
+
+      <!-- Category 4: Trekking & Camping -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('camp')" 
+        id="gearCatBtn-camp" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-teal-500 hover:text-teal-700"
+      >
+        <i data-lucide="tent" class="w-4 h-4 text-teal-600"></i>
+        <span>Trek & Camping</span>
+      </button>
+
+      <!-- Category 5: Electronics & Gadgets -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('tech')" 
+        id="gearCatBtn-tech" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-sky-500 hover:text-sky-700"
+      >
+        <i data-lucide="battery-charging" class="w-4 h-4 text-sky-600"></i>
+        <span>Travel Tech</span>
+      </button>
+
+      <!-- Category 6: Safety & Medical -->
+      <button 
+        type="button" 
+        onclick="window.setGearCategory('safety')" 
+        id="gearCatBtn-safety" 
+        class="gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-rose-500 hover:text-rose-700"
+      >
+        <i data-lucide="heart-pulse" class="w-4 h-4 text-rose-600"></i>
+        <span>Safety & Medical</span>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- 3. PRODUCTS GRID (DYNAMIC CARDS WITH COPY LINK & AMAZON REDIRECT) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="gearProductCardsContainer">
+    <!-- Cards will render here dynamically via JavaScript -->
+  </div>
+
+  <!-- Empty Search Result State -->
+  <div id="gearNoResults" class="hidden text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300 p-6">
+    <div class="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+      <i data-lucide="package-x" class="w-8 h-8"></i>
+    </div>
+    <h3 class="text-sm font-black text-slate-900">No matching travel gear found</h3>
+    <p class="text-xs text-slate-500 mt-1">Try searching for "backpack", "inflator", "charger" or select "All Gear"</p>
+    <button type="button" onclick="window.clearGearSearch()" class="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition">
+      Reset All Filters
+    </button>
+  </div>
+
+</div>
+
+
+<!-- ===================================================================== -->
+<!-- 4. CSS TO HIDE NEXT.JS BLACK 'N' ICON & FIX OVERLAPPING PREVIEW       -->
+<!-- ===================================================================== -->
+<style>
+  /* Hides Next.js 15 devtools black circle icon on mobile screen */
+  nextjs-portal,
+  [data-nextjs-toast],
+  [data-nextjs-dev-tools-button],
+  #nextjs-dev-tools-header,
+  div[data-nextjs-route-announcer] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+  }
+
+  /* Ensures Bottom Navigation sits above any browser preview overlays */
+  nav.fixed.bottom-0,
+  div.fixed.bottom-0 {
+    z-index: 99999 !important;
+  }
+</style>
+
+
+<!-- ===================================================================== -->
+<!-- 5. JAVASCRIPT ENGINE (STORE DATA, COPY LINK, FILTER & SEARCH)        -->
+<!-- ===================================================================== -->
+<script>
+// Catalog of High-Converting Travel Essentials
+window.gvelGearItems = [
+  {
+    id: 1,
+    category: 'bags',
+    name: 'All-Weather 55L Trekking Rucksack',
+    spec: 'Waterproof • Shoe Compartment • Rain Cover',
+    price: 1899,
+    mrp: 3499,
+    discount: '46% OFF',
+    rating: '4.8 ★ (2,400+)',
+    icon: 'backpack',
+    iconBg: 'bg-emerald-50 text-emerald-600',
+    link: 'https://www.amazon.in/s?k=trekking+rucksack+55l'
+  },
+  {
+    id: 2,
+    category: 'vehicle',
+    name: 'Digital Portable Tyre Inflator',
+    spec: 'Rechargeable 150 PSI • LED Torch • Auto-Cut',
+    price: 1499,
+    mrp: 2999,
+    discount: '50% OFF',
+    rating: '4.7 ★ (4,100+)',
+    icon: 'gauge',
+    iconBg: 'bg-amber-50 text-amber-600',
+    link: 'https://www.amazon.in/s?k=portable+car+tyre+inflator'
+  },
+  {
+    id: 3,
+    category: 'tech',
+    name: '20,000mAh Rugged Fast Power Bank',
+    spec: '22.5W Fast Charging • 3 Output Ports',
+    price: 1399,
+    mrp: 2499,
+    discount: '44% OFF',
+    rating: '4.6 ★ (8,900+)',
+    icon: 'battery-charging',
+    iconBg: 'bg-sky-50 text-sky-600',
+    link: 'https://www.amazon.in/s?k=20000mah+fast+powerbank'
+  },
+  {
+    id: 4,
+    category: 'safety',
+    name: 'Highway Emergency First-Aid Kit',
+    spec: '52 Medical Items • Antiseptic & Burn Relief',
+    price: 499,
+    mrp: 999,
+    discount: '50% OFF',
+    rating: '4.9 ★ (1,500+)',
+    icon: 'heart-pulse',
+    iconBg: 'bg-rose-50 text-rose-600',
+    link: 'https://www.amazon.in/s?k=emergency+first+aid+kit'
+  },
+  {
+    id: 5,
+    category: 'camp',
+    name: 'Instant Pop-Up 2-Person Waterproof Tent',
+    spec: 'UV Protection • Quick 30s Setup • Compact',
+    price: 2199,
+    mrp: 4999,
+    discount: '56% OFF',
+    rating: '4.5 ★ (920+)',
+    icon: 'tent',
+    iconBg: 'bg-teal-50 text-teal-600',
+    link: 'https://www.amazon.in/s?k=pop+up+camping+tent'
+  },
+  {
+    id: 6,
+    category: 'vehicle',
+    name: 'Vibration-Proof Bike & Car Mobile Holder',
+    spec: '360° Rotation • Anti-Fall Lock • Waterproof',
+    price: 349,
+    mrp: 799,
+    discount: '56% OFF',
+    rating: '4.6 ★ (3,200+)',
+    icon: 'navigation',
+    iconBg: 'bg-indigo-50 text-indigo-600',
+    link: 'https://www.amazon.in/s?k=bike+mobile+holder+vibration'
+  },
+  {
+    id: 7,
+    category: 'tech',
+    name: 'All-in-One Universal Travel Adapter',
+    spec: '150+ Countries • 3x USB + 1x Type-C PD',
+    price: 699,
+    mrp: 1499,
+    discount: '53% OFF',
+    rating: '4.8 ★ (5,400+)',
+    icon: 'zap',
+    iconBg: 'bg-amber-50 text-amber-600',
+    link: 'https://www.amazon.in/s?k=universal+travel+adapter'
+  },
+  {
+    id: 8,
+    category: 'bags',
+    name: 'Ultralight Foldable 20L Daypack',
+    spec: 'Water-Resistant • Weighs 120g • Fits Pocket',
+    price: 399,
+    mrp: 899,
+    discount: '55% OFF',
+    rating: '4.7 ★ (1,850+)',
+    icon: 'package',
+    iconBg: 'bg-purple-50 text-purple-600',
+    link: 'https://www.amazon.in/s?k=foldable+travel+backpack'
+  }
+];
+
+window.activeGearCategory = 'all';
+
+// Render Gear Products
+window.renderGearProducts = function(items) {
+  const container = document.getElementById('gearProductCardsContainer');
+  const countEl = document.getElementById('gearResultsCount');
+  const noRes = document.getElementById('gearNoResults');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    if (noRes) noRes.classList.remove('hidden');
+    if (countEl) countEl.innerText = '0 Items';
+    return;
+  }
+
+  if (noRes) noRes.classList.add('hidden');
+  if (countEl) countEl.innerText = `Showing ${items.length} Items`;
+
+  items.forEach(prod => {
+    const card = document.createElement('div');
+    card.className = "border border-slate-200 bg-white rounded-2xl p-4 shadow-sm hover:border-emerald-500 hover:shadow-md transition flex flex-col justify-between";
+    card.innerHTML = `
+      <div>
+        <!-- Product Visual Header -->
+        <div class="w-full h-36 ${prod.iconBg} rounded-xl flex items-center justify-center mb-3.5 relative overflow-hidden">
+          <i data-lucide="${prod.icon}" class="w-14 h-14"></i>
+          <span class="absolute top-2.5 left-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm text-slate-900 rounded-md text-[10px] font-black shadow-xs">
+            ${prod.discount}
+          </span>
+          <span class="absolute top-2.5 right-2.5 px-2 py-0.5 bg-emerald-600 text-white rounded-md text-[10px] font-bold">
+            ${prod.rating}
+          </span>
+        </div>
+
+        <!-- Product Information -->
+        <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+          ${prod.spec}
+        </span>
+        <h4 class="text-sm font-black text-slate-900 mt-2 line-clamp-1">${prod.name}</h4>
+
+        <!-- Price Section -->
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-base font-black text-slate-900">₹${prod.price.toLocaleString('en-IN')}</span>
+          <span class="text-xs text-slate-400 line-through">₹${prod.mrp.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons: Copy Link & Buy on Amazon -->
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+        <button 
+          type="button" 
+          onclick="window.copyGearProductLink('${prod.link}', this)" 
+          class="flex-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+          title="Copy Link to share"
+        >
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>Copy</span>
+        </button>
+
+        <a 
+          href="${prod.link}" 
+          target="_blank" 
+          class="flex-1 py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl text-center transition flex items-center justify-center gap-1 shadow-sm"
+        >
+          <span>Buy ↗</span>
+        </a>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+};
+
+// Category Switcher
+window.setGearCategory = function(cat) {
+  window.activeGearCategory = cat;
+  const categories = ['all', 'bags', 'vehicle', 'camp', 'tech', 'safety'];
+  
+  categories.forEach(c => {
+    const btn = document.getElementById(`gearCatBtn-${c}`);
+    if (btn) {
+      if (c === cat) {
+        btn.className = 'gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-slate-900 text-white shadow-sm';
+      } else {
+        btn.className = 'gear-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700';
+      }
+    }
+  });
+
+  window.filterGearItems();
+};
+
+// Filter by Search & Category
+window.filterGearItems = function() {
+  const query = (document.getElementById('gearSearchInput')?.value || '').toLowerCase().trim();
+  const clearBtn = document.getElementById('gearSearchClearBtn');
+  
+  if (clearBtn) {
+    if (query.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  const filtered = window.gvelGearItems.filter(item => {
+    const matchesCategory = (window.activeGearCategory === 'all' || item.category === window.activeGearCategory);
+    const matchesSearch = item.name.toLowerCase().includes(query) || item.spec.toLowerCase().includes(query);
+    return matchesCategory && matchesSearch;
+  });
+
+  window.renderGearProducts(filtered);
+};
+
+// Clear Search
+window.clearGearSearch = function() {
+  const input = document.getElementById('gearSearchInput');
+  if (input) input.value = '';
+  window.setGearCategory('all');
+};
+
+// Copy Link with Visual Toast Effect
+window.copyGearProductLink = function(url, btnElement) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      window.showCopySuccess(btnElement);
+    }).catch(() => {
+      window.fallbackCopy(url, btnElement);
+    });
+  } else {
+    window.fallbackCopy(url, btnElement);
+  }
+};
+
+window.fallbackCopy = function(text, btnElement) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  document.body.appendChild(textArea);
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    window.showCopySuccess(btnElement);
+  } catch (err) {}
+  document.body.removeChild(textArea);
+};
+
+window.showCopySuccess = function(btn) {
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = `<span class="text-emerald-600 font-black">Copied! ✓</span>`;
+  btn.classList.add('bg-emerald-50', 'border', 'border-emerald-200');
+  setTimeout(() => {
+    btn.innerHTML = originalHtml;
+    btn.classList.remove('bg-emerald-50', 'border', 'border-emerald-200');
+    if (window.lucide) window.lucide.createIcons();
+  }, 1800);
+};
+
+// Initialize Store on Tab Switch
+const origSwitchTab = window.switchTab;
+window.switchTab = function(tabName) {
+  if (origSwitchTab) {
+    try { origSwitchTab(tabName); } catch(e) {}
+  }
+  if (tabName === 'shopping') {
+    window.renderGearProducts(window.gvelGearItems);
+  }
+};
+
+// Auto init on load
+document.addEventListener('DOMContentLoaded', () => {
+  window.renderGearProducts(window.gvelGearItems);
+});
+</script>
+         
+     <!-- TAB 4: TRIP PLANNER CONTAINER -->
+<div id="tabPlanner" class="space-y-6 hidden">
+      
+      <!-- Stepper Indicator -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-xs flex items-center justify-between text-center max-w-2xl mx-auto">
+        <div onclick="window.setPlannerStep(1)" class="flex-1 cursor-pointer">
+          <div id="stepDot1" class="w-8 h-8 mx-auto rounded-full bg-emerald-600 text-white font-black text-sm flex items-center justify-center">1</div>
+          <span class="text-xs font-bold text-emerald-700 mt-1.5 block">City</span>
+        </div>
+        <div class="w-8 sm:w-16 border-t-2 border-slate-200"></div>
+        <div onclick="window.setPlannerStep(2)" class="flex-1 cursor-pointer">
+          <div id="stepDot2" class="w-8 h-8 mx-auto rounded-full bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center">2</div>
+          <span class="text-xs font-bold text-slate-400 mt-1.5 block">Budget</span>
+        </div>
+        <div class="w-8 sm:w-16 border-t-2 border-slate-200"></div>
+        <div onclick="window.setPlannerStep(3)" class="flex-1 cursor-pointer">
+          <div id="stepDot3" class="w-8 h-8 mx-auto rounded-full bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center">3</div>
+          <span class="text-xs font-bold text-slate-400 mt-1.5 block">Transport</span>
+        </div>
+        <div class="w-8 sm:w-16 border-t-2 border-slate-200"></div>
+        <div onclick="window.setPlannerStep(4)" class="flex-1 cursor-pointer">
+          <div id="stepDot4" class="w-8 h-8 mx-auto rounded-full bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center">4</div>
+          <span class="text-xs font-bold text-slate-400 mt-1.5 block">Plan & Map</span>
+        </div>
+      </div>
+
+      <!-- STEP 1: Select Destination (NOW 100% VISIBLE & POPULATED!) -->
+      <div id="plannerStep1" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-black text-slate-900">Step 1: Choose Your Destination</h3>
+            <p class="text-xs text-slate-500">Tap on any destination card below to proceed to budget selection</p>
+          </div>
+          <span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">Select to Continue</span>
+        </div>
+        
+        <!-- Grid populated automatically by window.renderPlannerCityGrid() -->
+        <div id="plannerCityGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+      </div>
+
+      <!-- STEP 2: Select Budget -->
+      <div id="plannerStep2" class="space-y-4 hidden">
+        <div>
+          <h3 class="text-lg font-black text-slate-900">Step 2: Select Your Budget Range</h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Configured Route: <span id="plannerOriginBadge" class="font-bold text-slate-800">Delhi NCR</span> ➔ <span id="plannerSelectedCityBadge" class="font-bold text-emerald-600">Varanasi</span>
+          </p>
+        </div>
+<!-- 1. Custom / Manual Budget Tool (On Top) -->
+        <div class="mb-4 bg-white border-2 border-emerald-500 rounded-2xl p-5 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span class="text-base font-black text-slate-900 flex items-center gap-1.5">
+                ⚙️ Custom / Manual Budget
+              </span>
+              <p class="text-xs text-slate-500 mt-0.5">Enter your exact trip budget</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">₹</span>
+                <input 
+                  type="number" 
+                  id="customBudgetInput" 
+                  placeholder="e.g. 7000" 
+                  class="w-36 pl-7 pr-3 py-2 text-sm font-bold border border-slate-300 rounded-xl focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <button 
+                type="button" 
+                onclick="const val = parseInt(document.getElementById('customBudgetInput').value); if(val > 0) { const tier = val < 5000 ? 'backpacker' : (val > 12000 ? 'luxury' : 'explorer'); window.selectPlannerBudgetTier(tier, val); } else { alert('Please enter a valid budget amount'); }" 
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition shadow-sm cursor-pointer"
+              >
+                Set Budget
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Backpacker & Luxury & Comfort Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Backpacker Card -->
+          <div onclick="window.selectPlannerBudgetTier('backpacker', 3500)" class="border-2 border-emerald-500 bg-emerald-50/40 rounded-2xl p-5 cursor-pointer hover:shadow-md transition">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-base font-black text-slate-900">🎒 Backpacker</span>
+              <span class="text-sm font-black text-emerald-600">₹2,500 - ₹5,000</span>
+            </div>
+            <p class="text-xs text-slate-600">Hostels, Dorms, Local Express Trains, Street Food</p>
+          </div>
+
+          <!-- Luxury & Comfort Card -->
+          <div onclick="window.selectPlannerBudgetTier('luxury', 16000)" class="border border-slate-200 hover:border-emerald-400 bg-white rounded-2xl p-5 cursor-pointer hover:shadow-md transition">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-base font-black text-slate-900">👑 Luxury & Comfort</span>
+              <span class="text-sm font-black text-slate-800">₹12,001+</span>
+            </div>
+            <p class="text-xs text-slate-600">Heritage Havelis, Flights, Private Cabs, Fine Dining</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Transport Choice -->
+      <div id="plannerStep3" class="space-y-4 hidden">
+        <h3 class="text-lg font-black text-slate-900">Step 3: Select Your Transport Type</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div onclick="window.selectPlannerTransport('4wheeler')" class="border border-slate-200 hover:border-emerald-500 bg-white rounded-2xl p-5 cursor-pointer shadow-xs">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black mb-3"><i data-lucide="car" class="w-6 h-6"></i></div>
+            <h4 class="text-base font-black text-slate-900">4-Wheeler (Car / Road Trip)</h4>
+            <p class="text-xs text-slate-500 mt-1">Highway Dhabas, Parking Stays, EV / Petrol Stations, Mystery Spots</p>
+          </div>
+          <div onclick="window.selectPlannerTransport('2wheeler')" class="border border-slate-200 hover:border-emerald-500 bg-white rounded-2xl p-5 cursor-pointer shadow-xs">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-black mb-3"><i data-lucide="bike" class="w-6 h-6"></i></div>
+            <h4 class="text-base font-black text-slate-900">2-Wheeler (Bike / Scooter)</h4>
+            <p class="text-xs text-slate-500 mt-1">Scenic curves, roadside mechanics, ghat alleys & dhabas</p>
+          </div>
+          <div onclick="window.selectPlannerTransport('walk')" class="border border-slate-200 hover:border-emerald-500 bg-white rounded-2xl p-5 cursor-pointer shadow-xs">
+            <div class="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-black mb-3"><i data-lucide="footprints" class="w-6 h-6"></i></div>
+            <h4 class="text-base font-black text-slate-900">Airways, Rails & Smart Transit</h4>
+            <p class="text-xs text-slate-500 mt-1">Fastest Flights, Tatkal Express, Premium Sleeper & Metros</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Custom Hub & Leaflet Map -->
+      <!-- ================================================================= -->
+<!-- STEP 4 MASTER CONTAINER: ROAD TRIP MODE vs AIRWAYS TRANSIT HUB    -->
+<!-- ================================================================= -->
+<div id="plannerStep4" class="space-y-6 hidden">
+
+  <!-- =============================================================== -->
+  <!-- 1. ROAD TRIP MODE (Car & Bike Ke Liye: Map + Nav + Rows View)   -->
+  <!-- =============================================================== -->
+  <div id="plannerRoadTripSection" class="space-y-5">
+    
+    <!-- Top Route & Live Navigation Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h3 class="text-base font-black text-slate-900" id="roadTripTitleText">Road Trip Navigator & Live Route</h3>
+        </div>
+        <p class="text-xs text-slate-500 mt-1" id="roadTripSubtitle">Live highway directions, dhabas, EV/Fuel & parking stays</p>
+        
+        <!-- Live Distance & Time Badges -->
+        <div class="flex items-center gap-2 mt-2.5">
+          <span class="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-[11px] font-black flex items-center gap-1">
+            <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
+            <span id="roadTripDistanceBadge">Active Highway Route</span>
+          </span>
+          <span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold flex items-center gap-1">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span id="roadTripTimeBadge">Live Highway Traffic</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 100% Free Google Maps Turn-by-Turn Redirect Button -->
+      <a 
+        id="gmapsDirectNavBtn"
+        href="https://www.google.com/maps/dir/?api=1" 
+        target="_blank" 
+        class="inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md transition cursor-pointer shrink-0"
+      >
+        <i data-lucide="navigation" class="w-4 h-4"></i>
+        <span>Start Turn-by-Turn on Google Maps</span>
+      </a>
+    </div>
+
+   
+    <!-- Interactive 3 Category Buttons (Dhabas, Parking Stays, Guiders & Secrets) -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h4 class="text-sm font-black text-slate-900">Explore Route Essentials</h4>
+          <p class="text-[11px] text-slate-500">Click a category to compare places in clean rows</p>
+        </div>
+        <!-- Row Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto">
+          <button 
+            type="button" 
+            id="roadSecBtn-dhabas" 
+            onclick="window.switchRoadCategory('dhabas')" 
+            class="px-3.5 py-2 text-xs font-black rounded-xl bg-slate-900 text-white transition flex items-center gap-1.5 shadow-sm"
+          >
+            <span>🍲 Highway Dhabas</span>
+          </button>
+          <button 
+            type="button" 
+            id="roadSecBtn-stays" 
+            onclick="window.switchRoadCategory('stays')" 
+            class="px-3.5 py-2 text-xs font-black rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5"
+          >
+            <span>🅿️ Secure Parking Stays</span>
+          </button>
+          <button 
+            type="button" 
+            id="roadSecBtn-secrets" 
+            onclick="window.switchRoadCategory('secrets')" 
+            class="px-3.5 py-2 text-xs font-black rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5"
+          >
+            <span>🧭 Guiders & Secret Spots</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 1. HIGHWAY DHABAS (Row Format) -->
+      <div id="roadContent-dhabas" class="road-content-block space-y-2.5">
+        <!-- Row 1 -->
+        <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="utensils" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Shree Highway Grand Dhaba & Family Lounge</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded">24/7 Open • Clean Toilets</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Special Butter Parathas, Kulhad Chai, AC family dining & clean washrooms</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-600">Avg ₹140 - ₹180</span>
+              <span class="block text-[10px] text-slate-400">⭐ 4.8 (850+ reviews)</span>
+            </div>
+            <a href="https://www.google.com/maps/search/?api=1&query=Highway+Dhaba" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Locate 📍</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="coffee" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Pehalwan Lassi & Desi Ghee Paratha Junction</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-amber-50 text-amber-700 rounded">Locals Favorite</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Thick malai lassi in clay matkas, hot samosas & shaded vehicle parking</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-600">Avg ₹100 - ₹150</span>
+              <span class="block text-[10px] text-slate-400">⭐ 4.7 (1,200+ reviews)</span>
+            </div>
+            <a href="https://www.google.com/maps/search/?api=1&query=Pehalwan+Dhaba" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Locate 📍</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. SECURE PARKING STAYS (Row Format) -->
+      <div id="roadContent-stays" class="road-content-block space-y-2.5 hidden">
+        <!-- Stay Row 1 -->
+        <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Highway Grand Resort & Motel</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded">CCTV Parking • EV Station</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Gated 24/7 security for cars & bikes, AC private rooms, lawn restaurant</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-600">₹1,250 / night</span>
+              <span class="block text-[10px] text-slate-400">OYO & Booking Partner</span>
+            </div>
+            <div class="flex gap-1.5">
+              <a href="https://www.google.com/maps/search/?api=1&query=Highway+Motel+Parking" target="_blank" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">📍 Map</a>
+              <a href="https://www.booking.com" target="_blank" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">Book ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stay Row 2 -->
+        <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="bike" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Rider's Pitstop Dorms & Covered Shed</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-sky-50 text-sky-700 rounded">Covered Bike Shed</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Budget biker dorms, mechanic kit on site, pressure wash available</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-600">₹499 / bed</span>
+              <span class="block text-[10px] text-slate-400">Hostel Verified</span>
+            </div>
+            <div class="flex gap-1.5">
+              <a href="https://www.google.com/maps/search/?api=1&query=Riders+Hostel" target="_blank" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">📍 Map</a>
+              <a href="https://www.oyorooms.com" target="_blank" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">Reserve ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. GUIDERS & SECRET SPOTS (Row Format) -->
+      <div id="roadContent-secrets" class="road-content-block space-y-2.5 hidden">
+        <!-- Secret Row 1 -->
+        <div class="border border-slate-200 hover:border-amber-400 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Panoramic Cliff Turn (Secret Sunset Viewpoint)</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-amber-50 text-amber-700 rounded">0% Crowd • Free Spot</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Safely pull over onto the wide shoulder for golden hour photography</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <span class="text-xs font-bold text-amber-700">Km 42 Highway Turn</span>
+            <a href="https://www.google.com/maps/search/?api=1&query=Scenic+Sunset+Viewpoint" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span>Pin on Map 📍</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Guide Row 2 -->
+        <div class="border border-slate-200 hover:border-sky-400 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs font-black text-slate-900">Raju Bhai (Local Route Guide & Mechanic Support)</h5>
+                <span class="text-[10px] font-black px-2 py-0.5 bg-sky-50 text-sky-700 rounded">Verified On-Call</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Knows offbeat bypass routes, towing support & heritage temple lanes</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-600">₹300 / assistance</span>
+              <span class="block text-[10px] text-slate-400">⭐ 4.9 (180+ trips)</span>
+            </div>
+            <a href="https://wa.me/919999999999?text=Hello%20Raju%20Bhai%20need%20route%20assistance" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+              <span>WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- =============================================================== -->
+  <!-- 2. AIRWAYS & TRANSIT HUB (No Map: 4 Tabs in Clean Rows)        -->
+  <!-- =============================================================== -->
+  <div id="plannerAirwaysTransitHub" class="space-y-5 hidden">
+    
+    <!-- Top Destination Concierge Banner -->
+    <div class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-5 text-white shadow-md">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase tracking-wider">
+            Destination Concierge Hub
+          </span>
+          <h3 class="text-lg font-black mt-2 text-white" id="transitHeroTitle">Direct Connectivity & Local Essentials</h3>
+          <p class="text-xs text-slate-300 mt-0.5">Compare transit tickets, reserve stays, discover secret spots and book guides</p>
+        </div>
+        <div class="hidden sm:flex w-12 h-12 rounded-2xl bg-white/10 items-center justify-center text-emerald-400">
+          <i data-lucide="compass" class="w-6 h-6"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 Navigation Tabs -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+      <button 
+        type="button" 
+        onclick="window.switchTransitHubTab('transport')" 
+        id="transitHubBtn-transport"
+        class="hub-tab-btn flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black transition bg-white text-emerald-700 shadow-sm"
+      >
+        <i data-lucide="plane" class="w-4 h-4"></i>
+        <span>1. Transport</span>
+      </button>
+
+      <button 
+        type="button" 
+        onclick="window.switchTransitHubTab('hotels')" 
+        id="transitHubBtn-hotels"
+        class="hub-tab-btn flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black transition text-slate-600 hover:text-slate-900"
+      >
+        <i data-lucide="building" class="w-4 h-4"></i>
+        <span>2. Hotels & Stays</span>
+      </button>
+
+      <button 
+        type="button" 
+        onclick="window.switchTransitHubTab('secrets')" 
+        id="transitHubBtn-secrets"
+        class="hub-tab-btn flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black transition text-slate-600 hover:text-slate-900"
+      >
+        <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+        <span>3. Secret Places</span>
+      </button>
+
+      <button 
+        type="button" 
+        onclick="window.switchTransitHubTab('guiders')" 
+        id="transitHubBtn-guiders"
+        class="hub-tab-btn flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black transition text-slate-600 hover:text-slate-900"
+      >
+        <i data-lucide="user-check" class="w-4 h-4 text-sky-600"></i>
+        <span>4. Guiders</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: TRANSPORT COMPARISON IN CLEAN ROWS -->
+    <div id="transitContent-transport" class="hub-tab-content space-y-3">
+      
+      <!-- Sub-Filters -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1">
+        <button onclick="window.filterSubTransport('all')" id="subTransBtn-all" class="sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-slate-900 text-white">All Modes</button>
+        <button onclick="window.filterSubTransport('flight')" id="subTransBtn-flight" class="sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-emerald-500">Aeroplane ✈️</button>
+        <button onclick="window.filterSubTransport('train')" id="subTransBtn-train" class="sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-emerald-500">Train / IRCTC 🚆</button>
+        <button onclick="window.filterSubTransport('bus')" id="subTransBtn-bus" class="sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-emerald-500">Volvo Bus 🚌</button>
+        <button onclick="window.filterSubTransport('cab')" id="subTransBtn-cab" class="sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-emerald-500">Prepaid Cab 🚕</button>
+      </div>
+
+      <!-- Row 1: Flights Comparison -->
+      <div class="trans-item border border-slate-200 hover:border-sky-500 bg-white rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition" data-mode="flight">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="plane" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Direct Flights & Low-Fare Deals</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-sky-50 text-sky-700 rounded">Fastest Mode</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Compare real-time airline ticket prices across Google Flights & MakeMyTrip</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <a href="https://www.google.com/travel/flights" target="_blank" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold rounded-xl transition">Google Flights ↗</a>
+          <a href="https://www.makemytrip.com/flights/" target="_blank" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">MakeMyTrip ↗</a>
+        </div>
+      </div>
+
+      <!-- Row 2: Train Comparison -->
+      <div class="trans-item border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition" data-mode="train">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="train" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">IRCTC Express, Vande Bharat & Tatkal</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded">Budget Choice</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Official berth booking, Tatkal seat prediction & train running status</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <a href="https://www.irctc.co.in" target="_blank" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition">IRCTC Official ↗</a>
+          <a href="https://www.confirmtkt.com" target="_blank" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">ConfirmTkt ↗</a>
+        </div>
+      </div>
+
+      <!-- Row 3: Volvo Bus Comparison -->
+      <div class="trans-item border border-slate-200 hover:border-rose-500 bg-white rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition" data-mode="bus">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="bus" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Intercity Volvo & Multi-Axle Sleeper Bus</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-rose-50 text-rose-700 rounded">Overnight Sleeper</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">AC sleeper berths with live bus tracking and premium boarding lounges</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <a href="https://www.redbus.in" target="_blank" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition">RedBus ↗</a>
+          <a href="https://www.zingbus.com" target="_blank" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">Zingbus ↗</a>
+        </div>
+      </div>
+
+      <!-- Row 4: Cab Comparison -->
+      <div class="trans-item border border-slate-200 hover:border-amber-500 bg-white rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition" data-mode="cab">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="car" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Airport & Railway Station Outstation Cabs</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-amber-50 text-amber-700 rounded">Door-to-Door</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Prepaid fixed-rate airport cabs or instant app bookings</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <a href="https://www.uber.com/in/en/" target="_blank" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-xl transition">Uber Rentals ↗</a>
+          <a href="https://www.olacabs.com" target="_blank" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">Ola Cabs ↗</a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 2: HOTELS & DORMS IN CLEAN ROWS -->
+    <div id="transitContent-hotels" class="hub-tab-content space-y-3 hidden">
+      <div class="flex items-center justify-between">
+        <div>
+          <h4 class="text-sm font-black text-slate-900">Verified Destination Stays & Hostels</h4>
+          <p class="text-[11px] text-slate-500">Backpacker dorms, ghat/beach facing stays & boutique rooms</p>
+        </div>
+        <a href="https://www.booking.com" target="_blank" class="text-xs font-bold text-emerald-600 hover:underline">See All 120+ Stays ↗</a>
+      </div>
+
+      <!-- Hotel Row 1 -->
+      <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="building" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Zostel Social Dorms & Rooftop Cafe</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded">⭐ 4.8 Top Rated</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">2.4 km from railway station. AC dorms, high-speed Wi-Fi & daily traveler meetups.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <div class="text-right">
+            <span class="text-xs font-black text-emerald-600">₹699 / bed</span>
+            <span class="block text-[10px] text-slate-400">Hostelworld & Booking</span>
+          </div>
+          <div class="flex gap-1.5">
+            <a href="https://www.google.com/maps/search/?api=1&query=Zostel+Stay" target="_blank" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Locate 📍</span>
+            </a>
+            <a href="https://www.booking.com" target="_blank" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">Book ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hotel Row 2 -->
+      <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="home" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Heritage Courtyard Haveli & Rooms</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-sky-50 text-sky-700 rounded">⭐ 4.6 River Facing</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Walking distance to main attraction. AC private rooms & rooftop morning views.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <div class="text-right">
+            <span class="text-xs font-black text-slate-900">₹1,450 / night</span>
+            <span class="block text-[10px] text-slate-400">OYO & Agoda Partner</span>
+          </div>
+          <div class="flex gap-1.5">
+            <a href="https://www.google.com/maps/search/?api=1&query=Heritage+Haveli+Hotel" target="_blank" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Locate 📍</span>
+            </a>
+            <a href="https://www.oyorooms.com" target="_blank" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">Reserve ↗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SECRET PLACES IN CLEAN ROWS -->
+    <div id="transitContent-secrets" class="hub-tab-content space-y-3 hidden">
+      <div>
+        <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+          <span>Curated Secret Places & Hidden Gems</span>
+        </h4>
+        <p class="text-[11px] text-slate-500">Crowd-free sunrise spots, legendary street food & mystery heritage corners</p>
+      </div>
+
+      <!-- Secret Row 1 -->
+      <div class="border border-slate-200 hover:border-amber-400 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Chet Singh Ghat Secret Roof View</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-amber-50 text-amber-700 rounded">0% Rush Sunrise Point</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Visit at 5:30 AM. Panoramic river bend view away from commercial boats.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <span class="text-[11px] font-bold text-emerald-600">Gvel Verified Tip</span>
+          <a href="https://www.google.com/maps/search/?api=1&query=Chet+Singh+Ghat" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Pin on Map 📍</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Secret Row 2 -->
+      <div class="border border-slate-200 hover:border-amber-400 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="utensils" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Kachori Gali Hidden Malaiyo Corner</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-rose-50 text-rose-700 rounded">90-Yr-Old Local Gem</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Authentic seasonal saffron foam dessert served in clay kulhads till 10:00 AM.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <span class="text-[11px] font-bold text-emerald-600">Gvel Verified Tip</span>
+          <a href="https://www.google.com/maps/search/?api=1&query=Kachori+Gali" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Pin on Map 📍</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: GUIDERS IN CLEAN ROWS -->
+    <div id="transitContent-guiders" class="hub-tab-content space-y-3 hidden">
+      <div>
+        <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+          <i data-lucide="user-check" class="w-4 h-4 text-sky-600"></i>
+          <span>Verified Local Guides & Cultural Storytellers</span>
+        </h4>
+        <p class="text-[11px] text-slate-500">Government certified guides, historians and audio walking tours</p>
+      </div>
+
+      <!-- Guider Row 1 -->
+      <div class="border border-slate-200 hover:border-sky-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Pandit Rajesh (Heritage Alleys Guide)</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-sky-50 text-sky-700 rounded">Government Certified</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Hindi & English. 1,000-year-old temple history, secret stories & photography spots.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <div class="text-right">
+            <span class="text-xs font-black text-emerald-600">₹500 / 2-Hr Tour</span>
+            <span class="block text-[10px] text-slate-400">⭐ 4.9 (340 Tours)</span>
+          </div>
+          <a href="https://wa.me/919999999999?text=Hello%20I%20want%20to%20book%20a%20Gvel%20guided%20tour" target="_blank" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1">
+            <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+            <span>WhatsApp Connect</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Guider Row 2: Audio Tour -->
+      <div class="border border-slate-200 hover:border-purple-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black shrink-0">
+            <i data-lucide="headphones" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-slate-900">Self-Guided Ghat Story Podcast</h5>
+              <span class="text-[10px] font-black px-2 py-0.5 bg-purple-50 text-purple-700 rounded">Audio Walking Tour</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Listen to bite-sized 3-minute stories on your earphones as you walk through riverbanks and lanes.</p>
+          </div>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <div class="text-right">
+            <span class="text-xs font-black text-purple-600">Free by Gvel</span>
+            <span class="block text-[10px] text-slate-400">Headphone Required</span>
+          </div>
+          <button type="button" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">
+            Play Audio Tour 🎧
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          
+
+          <div class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+            <div id="plannerSubTabsHeader" class="flex border-b border-slate-200 text-xs sm:text-sm font-bold"></div>
+            <div id="plannerSubTabContent" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </main>
+
+    <!-- ========================================== -->
+  <!-- 4. BOTTOM MOBILE NAVIGATION                -->
+  <!-- ========================================== -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg md:hidden">
+    <div class="grid grid-cols-4 items-center justify-around py-2 px-2 text-center">
+      
+      <!-- 1. Home -->
+      <button type="button" onclick="window.switchTab('home')" id="navHome" class="flex flex-col items-center justify-center py-1 text-emerald-600 transition">
+        <i data-lucide="home" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold mt-1">Home</span>
+      </button>
+
+      <!-- 2. Booking Links (Fixed ticket icon) -->
+      <button type="button" onclick="window.switchTab('budget')" id="navBudget" class="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-600 transition">
+        <i data-lucide="ticket" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold mt-1">Booking Links</span>
+      </button>
+
+      <!-- 3. Travel Gear (Fixed closed tag & alignment) -->
+      <button type="button" onclick="window.switchTab('shopping')" id="navShopping" class="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-600 transition">
+        <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold mt-1">Travel Gear</span>
+      </button>
+
+      <!-- 4. Planner -->
+      <button type="button" onclick="window.switchTab('planner')" id="navPlanner" class="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-600 transition">
+        <i data-lucide="map" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold mt-1">Planner</span>
+      </button>
+
+    </div>
+  </nav>
+
+
+  <!-- ========================================== -->
+  <!-- 5. STORY & MEME POPUPS                     -->
+  <!-- ========================================== -->
+  <div id="storyViewerModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex-col justify-between p-4 sm:p-8">
+    <div class="max-w-md w-full mx-auto flex-1 flex flex-col justify-between">
+      <div id="storyProgressContainer" class="flex gap-1.5 w-full pt-2 z-20"></div>
+      <div class="flex items-center justify-between text-white z-20 mt-3 px-1">
+        <div class="flex items-center gap-2">
+          <img id="storyHeaderImg" src="" class="w-9 h-9 rounded-full border border-white object-cover">
+          <div><h4 id="storyHeaderTitle" class="text-xs font-black">Festival Story</h4><span id="storyHeaderSub" class="text-[10px] text-slate-300">GVel Expedition</span></div>
+        </div>
+        <button type="button" onclick="window.closeStory()" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-black text-sm">✕</button>
+      </div>
+      <div class="relative flex-1 my-3 flex items-center justify-center overflow-hidden rounded-3xl bg-slate-900">
+        <img id="storyMainImage" src="" class="w-full h-full object-cover">
+        <div onclick="window.prevStory()" class="absolute left-0 top-0 bottom-0 w-1/3 z-10 cursor-pointer"></div>
+        <div onclick="window.nextStory()" class="absolute right-0 top-0 bottom-0 w-2/3 z-10 cursor-pointer"></div>
+        <div class="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md p-4 rounded-2xl text-white z-10 pointer-events-none">
+          <div id="storyBadge" class="inline-block bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full mb-1.5">DATES</div>
+          <h3 id="storyCaptionTitle" class="text-sm font-black">Story Title</h3>
+          <p id="storyCaptionText" class="text-xs text-slate-200 mt-1">Highlights & Travel Secrets</p>
+        </div>
+      </div>
+      <button type="button" onclick="window.planFromStory()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs z-20 active:scale-98 transition flex items-center justify-center gap-1.5 shadow-lg">
+        <i data-lucide="compass" class="w-4 h-4"></i> PLAN THIS TRIP NOW ↗
+      </button>
+    </div>
+  </div>
+
+  <div id="memeModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white border-2 border-rose-500 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl">
+      <div class="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3"><i data-lucide="laugh" class="w-9 h-9"></i></div>
+      <div class="inline-block bg-rose-600 text-white text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider mb-2">Lakshya Choudhary Meme Roast 😂</div>
+      <h3 class="text-base font-black text-slate-900 leading-snug">"Yeh jo gareeb hote hain na... <br><span class="text-rose-600">apni aadat se gareeb hote hain!"</span></h3>
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 my-3 text-xs text-slate-600 text-left">
+        <span class="font-bold text-slate-900 block mb-1">Are you serious with this budget? 💀</span>
+        You entered an amount lower than the realistic minimum expenses for this destination!
+      </div>
+      <div class="space-y-2">
+        <button type="button" onclick="window.fixBudgetAuto()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md transition">SET MINIMUM REALISTIC BUDGET (₹3,500)</button>
+        <button type="button" onclick="window.closeMemeModal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">I Understand, Close Roast</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drawers (Profile & Saved) -->
+  <div id="profileDrawer" class="fixed inset-0 z-50 bg-black/50 hidden">
+    <div class="absolute right-0 top-0 bottom-0 w-80 sm:w-96 bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+          <h3 class="text-base font-black text-slate-900">GVel Profile & Menu</h3>
+          <button type="button" onclick="document.getElementById('profileDrawer').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-black">✕</button>
+        </div>
+        <div class="flex items-center gap-3 my-5">
+          <div class="w-12 h-12 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-lg">D</div>
+          <div><div id="drawerUserName" class="text-sm font-black text-slate-900">Deepak (Explorer)</div><div id="drawerUserContact" class="text-xs text-slate-400">+91 9876543210</div></div>
+        </div>
+        <div class="space-y-2 text-xs font-bold text-slate-700">
+          <button type="button" onclick="window.editProfileModal()" class="w-full flex items-center gap-2.5 p-3 rounded-xl hover:bg-slate-100 text-left"><i data-lucide="user" class="w-4 h-4 text-emerald-600"></i> Edit Profile Info</button>
+          <button type="button" onclick="window.setCurrentLocationPrompt()" class="w-full flex items-center gap-2.5 p-3 rounded-xl hover:bg-slate-100 text-left"><i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i> Set Current Location</button>
+          <button type="button" onclick="alert('Namaste! GVel Saathi is ready.')" class="w-full flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 text-emerald-800 text-left"><i data-lucide="bot" class="w-4 h-4 text-emerald-600"></i> Chat with GVel Saathi (AI Guide)</button>
+        </div>
+      </div>
+      <button type="button" onclick="window.logoutUser()" class="w-full py-3 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 font-black text-xs rounded-xl transition">Log Out</button>
+    </div>
+  </div>
+
+  <div id="savedDrawer" class="fixed inset-0 z-50 bg-black/50 hidden">
+    <div class="absolute left-0 top-0 bottom-0 w-80 sm:w-96 bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+          <h3 class="text-base font-black text-slate-900 flex items-center gap-2"><i data-lucide="bookmark" class="w-5 h-5 text-emerald-600"></i> Saved Places</h3>
+          <button type="button" onclick="document.getElementById('savedDrawer').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 font-black">✕</button>
+        </div>
+        <div id="savedLocationsList" class="my-4 space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 6. COMPLETE SCRIPT LOGIC                   -->
+  <!-- ========================================== -->
+  <script>
+    // Swap From and To Input values
+    window.swapRouteCities = function() {
+      const fromEl = document.getElementById('routeFromInput');
+      const toEl = document.getElementById('routeToInput');
+      const temp = fromEl.value;
+      fromEl.value = toEl.value;
+      toEl.value = temp;
+    };
+          // ============================================================
+    // GVEL GLOBAL BIDIRECTIONAL ROUTE SYNC ENGINE
+    // ============================================================
+    window.syncGlobalRoute = function(fromVal, toVal, triggeredBy) {
+      // 1. Synchronize Departure (Origin)
+      if (fromVal !== undefined && fromVal !== null) {
+        const cleanFrom = fromVal.trim();
+        window.plannerState.origin = cleanFrom || 'Delhi NCR';
+
+        const homeFrom = document.getElementById('routeFromInput');
+        const bookFrom = document.getElementById('gvelFrom');
+        const badgeFrom = document.getElementById('plannerOriginBadge');
+
+        if (homeFrom && triggeredBy !== 'homeFrom' && homeFrom.value !== cleanFrom) {
+          homeFrom.value = cleanFrom;
+        }
+        if (bookFrom && triggeredBy !== 'bookFrom' && bookFrom.value !== cleanFrom) {
+          bookFrom.value = cleanFrom;
+        }
+        if (badgeFrom) {
+          badgeFrom.innerText = cleanFrom || 'Delhi NCR';
+        }
+      }
+
+      // 2. Synchronize Destination
+      if (toVal !== undefined && toVal !== null) {
+        const cleanTo = toVal.trim();
+        window.plannerState.destName = cleanTo || 'Destination';
+
+        const homeTo = document.getElementById('routeToInput');
+        const bookTo = document.getElementById('gvelTo');
+        const badgeTo = document.getElementById('plannerSelectedCityBadge');
+
+        if (homeTo && triggeredBy !== 'homeTo' && homeTo.value !== cleanTo) {
+          homeTo.value = cleanTo;
+        }
+        if (bookTo && triggeredBy !== 'bookTo' && bookTo.value !== cleanTo) {
+          bookTo.value = cleanTo;
+        }
+        if (badgeTo) {
+          badgeTo.innerText = cleanTo || 'Destination';
+        }
+
+        // Match with destinations list if applicable
+        if (window.DESTINATIONS) {
+          const matched = window.DESTINATIONS.find(d => 
+            d.name.toLowerCase().includes(cleanTo.toLowerCase()) || 
+            d.location.toLowerCase().includes(cleanTo.toLowerCase())
+          );
+          if (matched) {
+            window.plannerState.destId = matched.id;
+          }
+        }
+      }
+
+      // 3. Auto-refresh booking cards if Booking tab is currently active
+      if (window.activeTab === 'budget' && window.renderBookingCards) {
+        window.renderBookingCards();
+      }
+    };
+
+    // Swap cities handler updated to sync globally
+    window.swapRouteCities = function() {
+      const fromEl = document.getElementById('routeFromInput');
+      const toEl = document.getElementById('routeToInput');
+      if (fromEl && toEl) {
+        const temp = fromEl.value;
+        fromEl.value = toEl.value;
+        toEl.value = temp;
+        window.syncGlobalRoute(fromEl.value, toEl.value, 'swap');
+      }
+    };
+
+
+    // Real route search: Nominatim geocoding + OSRM road route.
+    window.directRouteLeaflet = null;
+    window.directRouteLayer = null;
+    window.geocodePlace = async function(place) {
+      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(place + ', India');
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Location lookup failed. Try again or use Open navigation.');
+      const results = await response.json();
+      if (!results.length) throw new Error('Could not find “' + place + '”. Try a nearby city or landmark.');
+      return { lat: Number(results[0].lat), lng: Number(results[0].lon), label: results[0].display_name };
+    };
+    // ============================================================
+    // FAST & COMPACT ROUTE ENGINE (NO HEAVY LEAFLET MAP)
+    // ============================================================
+    window.planDirectRoute = async function() {
+      const fromCity = document.getElementById('routeFromInput')?.value.trim();
+      const toCity = document.getElementById('routeToInput')?.value.trim();
+      const panel = document.getElementById('routeResultsPanel');
+
+      if (!fromCity || !toCity) {
+        alert('Please enter both departure city and destination.');
+        return;
+      }
+
+      // Show panel immediately
+      if (panel) panel.classList.remove('hidden');
+      panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Update Labels
+      const origEl = document.getElementById('routeDisplayOrigin');
+      const destEl = document.getElementById('routeDisplayDest');
+      if (origEl) origEl.innerText = fromCity;
+      if (destEl) destEl.innerText = toCity;
+
+      // Update Turn-by-Turn Google Maps Direct Redirect Link (100% Free)
+      const navBtn = document.getElementById('openGoogleRoute');
+      if (navBtn) {
+        navBtn.href = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(fromCity)}&destination=${encodeURIComponent(toCity)}&travelmode=driving`;
+      }
+
+      try {
+        // Fast Geocoding
+        const points = await Promise.all([window.geocodePlace(fromCity), window.geocodePlace(toCity)]);
+        const origin = points[0], destination = points[1];
+
+        // OSRM Driving Highway Math
+        const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`;
+        const response = await fetch(url);
+        
+        let kmStr = "Direct Highway";
+        let timeStr = "Live Traffic in App";
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.routes && data.routes.length > 0) {
+            const km = Math.round(data.routes[0].distance / 1000);
+            const hours = data.routes[0].duration / 3600;
+            const h = Math.floor(hours);
+            const m = Math.round((hours % 1) * 60);
+
+            kmStr = `${km.toLocaleString('en-IN')} km`;
+            timeStr = `${h}h ${m}m driving`;
+          }
+        }
+
+        // Update Snapshot Badges
+        const distBadge = document.getElementById('routeDisplayDistance');
+        const timeBadge = document.getElementById('routeDisplayTime');
+        const chipDist = document.getElementById('routeChipDistance');
+        const chipTime = document.getElementById('routeChipTime');
+
+        if (distBadge) distBadge.innerText = kmStr;
+        if (timeBadge) timeBadge.innerText = timeStr;
+        if (chipDist) chipDist.innerText = kmStr;
+        if (chipTime) chipTime.innerText = timeStr;
+
+        // Save into global planner state
+        window.plannerState.origin = fromCity;
+        const match = window.DESTINATIONS.find(d => (d.id + ' ' + d.name + ' ' + d.location).toLowerCase().includes(toCity.toLowerCase()));
+        if (match) {
+          window.plannerState.destId = match.id;
+          window.plannerState.destName = match.name;
+        }
+
+      } catch (err) {
+        console.warn("Route distance calculation fallback:", err);
+      }
+
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    // Send Home route directly into Planner Tab (Step 2)
+    window.transferRouteToPlanner = function() {
+      const toCity = document.getElementById('routeToInput')?.value.trim() || 'Goa';
+      const fromCity = document.getElementById('routeFromInput')?.value.trim() || 'Delhi NCR';
+
+      window.plannerState.origin = fromCity;
+      const match = window.DESTINATIONS.find(d => (d.id + ' ' + d.name + ' ' + d.location).toLowerCase().includes(toCity.toLowerCase()));
+      
+      if (match) {
+        window.startPlannerFor(match.id);
+      } else {
+        window.switchTab('planner');
+        window.setPlannerStep(2);
+      }
+    };
+
+    // SWITCH TABS
+    window.switchTab = function(tab) {
+      window.activeTab = tab;
+      const tabs = ['home', 'budget', 'shopping', 'planner'];
+      tabs.forEach(t => {
+        const pageEl = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const mobileNavEl = document.getElementById('nav' + t.charAt(0).toUpperCase() + t.slice(1));
+        const desktopNavEl = document.getElementById('dNav' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          if (pageEl) pageEl.classList.remove('hidden');
+          if (mobileNavEl) mobileNavEl.className = "flex flex-col items-center justify-center py-1 text-emerald-600 transition";
+          if (desktopNavEl) desktopNavEl.className = "px-4 py-2 rounded-xl bg-white text-emerald-700 shadow-xs flex items-center gap-1.5";
+        } else {
+          if (pageEl) pageEl.classList.add('hidden');
+          if (mobileNavEl) mobileNavEl.className = "flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-600 transition";
+          if (desktopNavEl) desktopNavEl.className = "px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 flex items-center gap-1.5";
+        }
+      });
+      
+      // ALWAYS RENDER PLANNER STEP 1 GRID WHEN SWITCHING TO PLANNER
+      if (tab === 'planner') {
+        window.renderPlannerCityGrid();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // RENDER FEED CARDS ON HOME
+    window.renderFeed = function() {
+      const container = document.getElementById('destinationsFeedList');
+      if (!container) return;
+      container.innerHTML = window.DESTINATIONS.map(d => {
+        const isSaved = window.savedPlaces.includes(d.id);
+        return `
+          <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs hover:shadow-lg transition flex flex-col justify-between group">
+            <div class="relative h-52 sm:h-56 w-full bg-slate-100 overflow-hidden">
+              <img src="${d.image}" onerror="this.onerror=null; this.src='${d.fallback}';" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+              <span class="absolute top-3 left-3 ${d.tagColor} text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-sm">${d.tag}</span>
+              <button type="button" onclick="window.toggleSavePlace('${d.id}')" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center shadow-md active:scale-90 transition">
+                <i data-lucide="bookmark" class="w-4 h-4 ${isSaved ? 'text-emerald-600 fill-emerald-600' : 'text-slate-700'}"></i>
+              </button>
+              <div class="absolute bottom-3 left-3 right-3 flex justify-between items-end text-white text-shadow-sm">
+                <div><h3 class="text-base font-black">${d.name}</h3><div class="text-[11px] font-medium text-slate-200 flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3 text-emerald-400"></i> ${d.location}</div></div>
+                <div class="text-right"><div class="text-[9px] uppercase tracking-wider text-slate-300">Est. Trip</div><div class="text-xs font-black text-amber-300">${d.budget}</div></div>
+              </div>
+            </div>
+            <div class="p-4 flex items-center justify-between gap-3">
+              <p class="text-xs text-slate-600 line-clamp-1 flex-1">${d.desc}</p>
+              <button type="button" onclick="window.startPlannerFor('${d.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl active:scale-95 transition flex items-center gap-1 flex-shrink-0">
+                Plan Trip <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    window.filterDestinations = function() {
+      const q = document.getElementById('destinationSearch').value.toLowerCase();
+      const cards = document.querySelectorAll('#destinationsFeedList > div');
+      let visible = 0;
+      cards.forEach((card, idx) => {
+        const d = window.DESTINATIONS[idx];
+        const match = d.name.toLowerCase().includes(q) || d.location.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q);
+        card.style.display = match ? 'flex' : 'none';
+        if (match) visible++;
+      });
+      const fc = document.getElementById('feedCount');
+      if (fc) fc.innerText = visible + ' places';
+    };
+
+    // RENDER STEP 1 CITY GRID (CRUCIAL FIX - PREVENTS BLANK SCREEN!)
+    window.renderPlannerCityGrid = function() {
+      const container = document.getElementById('plannerCityGrid');
+      if (!container) return;
+      container.innerHTML = window.DESTINATIONS.map(d => `
+        <div onclick="window.startPlannerFor('${d.id}')" class="border border-slate-200 hover:border-emerald-500 bg-white rounded-2xl p-3 cursor-pointer shadow-xs hover:shadow-md active:scale-95 transition flex flex-col justify-between group">
+          <div class="relative h-28 w-full rounded-xl overflow-hidden mb-2">
+            <img src="${d.image}" onerror="this.onerror=null; this.src='${d.fallback}';" class="w-full h-full object-cover group-hover:scale-105 transition">
+            <span class="absolute top-1.5 right-1.5 bg-black/60 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">${d.budget}</span>
+          </div>
+          <h4 class="text-xs font-black text-slate-900 line-clamp-1 group-hover:text-emerald-600">${d.name}</h4>
+          <span class="text-[11px] text-slate-500 block truncate">${d.location}</span>
+          <div class="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold text-emerald-600">
+            <span>Select & Plan</span>
+            <span>→</span>
+          </div>
+        </div>
+      `).join('');
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    // STEPPER LOGIC
+    window.startPlannerFor = function(destId) {
+      window.plannerState.destId = destId;
+      const dest = window.DESTINATIONS.find(d => d.id === destId) || window.DESTINATIONS[0];
+      document.getElementById('plannerSelectedCityBadge').innerText = dest.name;
+      document.getElementById('plannerOriginBadge').innerText = window.plannerState.origin;
+      window.switchTab('planner');
+      window.setPlannerStep(2);
+    };
+
+    window.setPlannerStep = function(step) {
+      for (let i = 1; i <= 4; i++) {
+        const stepEl = document.getElementById(`plannerStep${i}`);
+        const dotEl = document.getElementById(`stepDot${i}`);
+        if (i === step) {
+          if (stepEl) stepEl.classList.remove('hidden');
+          if (dotEl) dotEl.className = "w-8 h-8 mx-auto rounded-full bg-emerald-600 text-white font-black text-sm flex items-center justify-center";
+        } else {
+          if (stepEl) stepEl.classList.add('hidden');
+          if (dotEl) dotEl.className = "w-8 h-8 mx-auto rounded-full bg-slate-200 text-slate-600 font-black text-sm flex items-center justify-center";
+        }
+      }
+      
+      if (step === 1) {
+        window.renderPlannerCityGrid(); // Render immediately if user clicks Step 1!
+      }
+      if (step === 2) {
+        const dest = window.DESTINATIONS.find(d => d.id === window.plannerState.destId) || window.DESTINATIONS[0];
+        document.getElementById('plannerSelectedCityBadge').innerText = dest.name;
+        document.getElementById('plannerOriginBadge').innerText = window.plannerState.origin;
+      }
+      if (step === 4) {
+        window.renderPlannerStep4();
+      }
+    };
+
+    window.selectPlannerBudgetTier = function(tier, amount) {
+      window.plannerState.budget = amount;
+      window.setPlannerStep(3);
+    };
+
+    window.selectPlannerTransport = function(type) {
+      window.plannerState.transport = type;
+      window.setPlannerStep(4);
+    };
+
+    window.renderPlannerStep4 = function() {
+      const dest = window.DESTINATIONS.find(d => d.id === window.plannerState.destId) || window.DESTINATIONS[0];
+      const transport = window.plannerState.transport;
+      const subTabsHeader = document.getElementById('plannerSubTabsHeader');
+      const contentBox = document.getElementById('plannerSubTabContent');
+
+      if (transport === '4wheeler' || transport === '2wheeler') {
+        document.getElementById('plannerHubTitle').innerText = `${transport === '4wheeler' ? '🚗 4-Wheeler' : '🏍️ 2-Wheeler'} Route Hub`;
+        document.getElementById('plannerHubSubtitle').innerText = `Direct Highway Corridors: ${window.plannerState.origin} ➔ ${dest.name}`;
+        subTabsHeader.innerHTML = `
+          <button type="button" onclick="window.switchPlannerSubtab('dhabas')" class="flex-1 py-2.5 text-center border-b-2 border-emerald-600 text-emerald-700 font-black">Highway Dhabas</button>
+          <button type="button" onclick="window.switchPlannerSubtab('stays')" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 font-bold">Secure Parking Stays</button>
+        `;
+        contentBox.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 leading-relaxed">
+              <span class="font-black block mb-1">⛽ Verified Pitstop & Fuel Alert:</span>
+              Expressways feature EV fast charging hubs every 60 km. Highway dhabas offer round-the-clock hot chai, covered resting sheds, and tyre inflation.
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-1">
+              <div class="flex justify-between items-center"><span class="text-xs font-black text-slate-900">Grand Highway Plaza (KM 142)</span><span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">24x7</span></div>
+              <p class="text-xs text-slate-600">Clay cup tandoori tea, hot parathas, clean washrooms, and gated parking.</p>
+              <div class="text-xs font-bold text-emerald-700">Avg Cost: ₹150 / person</div>
+            </div>
+          </div>
+        `;
+      } else {
+        document.getElementById('plannerHubTitle').innerText = `🎒 Backpacker & Walk Hub`;
+        document.getElementById('plannerHubSubtitle').innerText = `Transit: ${window.plannerState.origin} ➔ ${dest.name}`;
+        subTabsHeader.innerHTML = `
+          <button type="button" onclick="window.switchPlannerSubtab('transit_5brand')" class="flex-1 py-2.5 text-center border-b-2 border-emerald-600 text-emerald-700 font-black">Transit Comparison</button>
+          <button type="button" onclick="window.switchPlannerSubtab('hostels_5brand')" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 font-bold">Hostels & Dorms</button>
+        `;
+        contentBox.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+              <div class="flex justify-between items-center"><div class="flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-rose-600 text-white font-black text-xs flex items-center justify-center">R</span><span class="text-xs font-black text-slate-900">RedBus Sleeper / Volvo</span></div><span class="text-xs font-black text-slate-900">₹650 - ₹1,200</span></div>
+              <a href="https://www.redbus.in" target="_blank" class="block w-full text-center py-2 bg-rose-50 text-rose-700 font-black text-xs rounded-xl border border-rose-200">Click here to direct book from website link ↗</a>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+              <div class="flex justify-between items-center"><div class="flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-blue-700 text-white font-black text-xs flex items-center justify-center">🚆</span><span class="text-xs font-black text-slate-900">IRCTC Rail Express / Tatkal</span></div><span class="text-xs font-black text-slate-900">₹320 - ₹850</span></div>
+              <a href="https://www.irctc.co.in" target="_blank" class="block w-full text-center py-2 bg-blue-50 text-blue-700 font-black text-xs rounded-xl border border-blue-200">Click here to direct book from website link ↗</a>
+            </div>
+          </div>
+        `;
+      }
+      setTimeout(() => { window.initOrUpdateMap(dest.lat, dest.lng, dest.name); }, 200);
+    };
+
+    window.switchPlannerSubtab = function(tabName) {
+      const contentBox = document.getElementById('plannerSubTabContent');
+      if (tabName === 'stays') {
+        contentBox.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div class="flex justify-between items-center"><span class="text-xs font-black text-slate-900">Heritage Haveli & Resort</span><span class="text-xs font-black text-emerald-600">Live price link</span></div>
+              <p class="text-xs text-slate-600 mt-1">Check current availability and nightly rates with the booking provider.</p><a href="https://www.google.com/travel/hotels" target="_blank" rel="noreferrer" class="block mt-2 text-center py-2 bg-emerald-50 text-emerald-700 font-black text-xs rounded-xl">Check live hotel prices ↗</a>
+            </div>
+          </div>
+        `;
+      } else if (tabName === 'hostels_5brand') {
+        contentBox.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+              <div class="flex justify-between items-center"><span class="text-xs font-black text-slate-900">Zostel Backpacker Dorm</span><span class="text-xs font-black text-emerald-600">Check current rate</span></div>
+              <a href="https://www.zostel.com" target="_blank" rel="noreferrer" class="block w-full text-center py-2 bg-emerald-50 text-emerald-700 font-black text-xs rounded-xl">Check availability & price ↗</a>
+            </div>
+          </div>
+        `;
+      } else {
+        window.renderPlannerStep4();
+      }
+    };
+
+    window.initOrUpdateMap = async function(lat, lng, cityName) {
+      if (!window.L) return;
+      const mapContainer = document.getElementById('plannerMap'); if (!mapContainer) return;
+      if (!window.leafletMap) { window.leafletMap = L.map('plannerMap').setView([lat,lng],13); L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}').addTo(window.leafletMap); }
+      else { window.leafletMap.setView([lat,lng],13); window.leafletMap.invalidateSize(); }
+      window.currentMapMarkers.forEach(m=>window.leafletMap.removeLayer(m)); window.currentMapMarkers=[];
+      const status=document.getElementById('plannerHubSubtitle'); if(status) status.innerText=`Searching OpenStreetMap for hospitals, fuel and stays near ${cityName}…`;
+      try {
+        const query=`[out:json][timeout:20];(node[amenity=hospital](around:8000,${lat},${lng});node[amenity=fuel](around:8000,${lat},${lng});node[tourism=hotel](around:8000,${lat},${lng});node[tourism=hostel](around:8000,${lat},${lng}););out body 80;`;
+        const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:'data='+encodeURIComponent(query)});
+        if(!response.ok) throw new Error('Nearby places service is busy. Please try again shortly.');
+        const data=await response.json();
+        data.elements.forEach(item=>{
+          if(typeof item.lat!=='number'||typeof item.lon!=='number') return;
+          const tags=item.tags||{}, category=tags.amenity==='hospital'?'hospital':tags.amenity==='fuel'?'fuel':'stay';
+          const name=tags.name||({hospital:'Hospital/clinic',fuel:'Fuel station',stay:'Hotel/hostel'}[category]);
+          const marker=L.marker([item.lat,item.lon]).addTo(window.leafletMap).bindPopup(`<b>${name}</b><br>${category==='hospital'?'Hospital / medical care':category==='fuel'?'Fuel station':'Accommodation'}<br><small>OpenStreetMap listing; verify hours and availability.</small>`);
+          marker.category=category; window.currentMapMarkers.push(marker);
+        });
+        if(status) status.innerText=`${data.elements.length} nearby OpenStreetMap records found around ${cityName}. Listings may be incomplete; verify before travel.`;
+        if(!data.elements.length && status) status.innerText=`No nearby listings returned for ${cityName}. Try zooming out or opening a map search.`;
+      } catch(error) { if(status) status.innerText=error.message; }
+    };
+
+    window.filterMapPins = function(category) {
+      if (!window.leafletMap) return;
+      window.currentMapMarkers.forEach(marker => {
+        if (category === 'all' || marker.category === category) window.leafletMap.addLayer(marker);
+        else window.leafletMap.removeLayer(marker);
+      });
+    };
+
+    // SAVED LOCATIONS
+    window.toggleSavePlace = function(destId) {
+      if (window.savedPlaces.includes(destId)) window.savedPlaces = window.savedPlaces.filter(id => id !== destId);
+      else window.savedPlaces.push(destId);
+      window.updateSavedCountBadge();
+      window.renderFeed();
+      if (!document.getElementById('savedDrawer').classList.contains('hidden')) window.renderSavedDrawer();
+    };
+
+    window.updateSavedCountBadge = function() {
+      const b = document.getElementById('savedCountBadge');
+      if (b) b.innerText = window.savedPlaces.length;
+    };
+
+    window.openSavedDrawer = function() { window.renderSavedDrawer(); document.getElementById('savedDrawer').classList.remove('hidden'); };
+    window.renderSavedDrawer = function() {
+      const container = document.getElementById('savedLocationsList');
+      if (window.savedPlaces.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-slate-400 py-8">No saved locations yet.<br>Click bookmark icon on any card!</div>`;
+        return;
+      }
+      container.innerHTML = window.savedPlaces.map(id => {
+        const d = window.DESTINATIONS.find(x => x.id === id);
+        if (!d) return '';
+        return `
+          <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+            <img src="${d.image}" onerror="this.onerror=null; this.src='${d.fallback}';" class="w-12 h-12 rounded-xl object-cover">
+            <div class="flex-1 min-w-0"><h5 class="text-xs font-black text-slate-900 truncate">${d.name}</h5><span class="text-[10px] text-slate-500">${d.location.split(',')[0]}</span></div>
+            <button type="button" onclick="window.startPlannerFor('${d.id}'); document.getElementById('savedDrawer').classList.add('hidden');" class="px-2.5 py-1 bg-emerald-600 text-white font-bold text-[10px] rounded-lg">Plan</button>
+          </div>
+        `;
+      }).join('');
+    };
+
+        // ============================================================
+    // 2D INTERACTIVE FESTIVAL CALENDAR ENGINE
+    // ============================================================
+    // Auto-detect dynamic month & year on load
+const _calDate = new Date();
+window.currentCalYear = _calDate.getFullYear();
+window.currentCalMonth = _calDate.getMonth();
+// 10 = November (0-indexed: Jan=0, Nov=10)
+    window.currentSelectedEventId = 'varanasi';
+
+    window.FESTIVAL_DETAILS = {
+      'varanasi': {
+        id: 'varanasi',
+        name: 'Dev Deepawali (84 Ghats)',
+        city: 'Varanasi, Uttar Pradesh',
+        dateStr: '24 November 2026',
+        day: 24,
+        month: 10,
+        year: 2026,
+        tag: 'Festival Special',
+        budget: '₹3,500 - ₹6,500',
+        bestTime: 'Sunset Boat Tour (5:30 PM)',
+        img: 'https://images.unsplash.com/photo-1571536802807-30451e3955d8?w=800&auto=format&fit=crop&q=80',
+        pitch: 'Over one million glowing earthen diyas illuminate all 84 Ganga ghats simultaneously. Legend holds that Hindu deities descend to take a holy dip on Kartik Purnima. Book evening boats from Assi to Dashashwamedh for full panoramic illumination.'
+      },
+      'pushkar': {
+        id: 'pushkar',
+        name: 'Pushkar Camel Fair',
+        city: 'Pushkar, Rajasthan',
+        dateStr: '17 November 2026',
+        day: 17,
+        month: 10,
+        year: 2026,
+        tag: 'Iconic Desert Fair',
+        budget: '₹3,000 - ₹7,000',
+        bestTime: 'Sunrise Dunes & Camel Races',
+        img: 'https://images.unsplash.com/photo-1509744645300-a2098b11871a?w=800&auto=format&fit=crop&q=80',
+        pitch: 'The world-famous gathering of 50,000+ adorned camels, folk musicians, desert camps, and hot air balloons against the golden Thar dunes during Kartik Purnima.'
+      },
+      'chhath': {
+        id: 'chhath',
+        name: 'Chhath Puja Mahaparv',
+        city: 'Patna, Bihar',
+        dateStr: '15 November 2026',
+        day: 15,
+        month: 10,
+        year: 2026,
+        tag: 'Sacred Sun Festival',
+        budget: '₹2,000 - ₹4,500',
+        bestTime: 'Dawn Arghya at Ganga Ghats',
+        img: 'https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800&auto=format&fit=crop&q=80',
+        pitch: 'Deeply spiritual 4-day festival dedicated to Surya Dev and Chhathi Maiya. Millions offer holy arghya at sunrise on Ganga ghats with pure devotional atmosphere.'
+      },
+      'hornbill': {
+        id: 'hornbill',
+        name: 'Hornbill Tribal Festival',
+        city: 'Kisama, Nagaland',
+        dateStr: '1 December 2026',
+        day: 1,
+        month: 11,
+        year: 2026,
+        tag: 'Festival of Festivals',
+        budget: '₹8,000 - ₹15,000',
+        bestTime: 'Morning Morung Tribal Dances',
+        img: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&auto=format&fit=crop&q=80',
+        pitch: 'Experience 16 indigenous tribes of Nagaland celebrating their rich heritage with traditional folk songs, warrior dances, authentic feasts, and rock concerts.'
+      },
+      'bundi': {
+        id: 'bundi',
+        name: 'Bundi Utsav',
+        city: 'Bundi, Rajasthan',
+        dateStr: '27 November 2026',
+        day: 27,
+        month: 10,
+        year: 2026,
+        tag: 'Heritage Spectacle',
+        budget: '₹2,500 - ₹5,000',
+        bestTime: 'Deep Daan at Naval Sagar',
+        img: 'https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=800&auto=format&fit=crop&q=80',
+        pitch: 'A vibrant showcase of Rajasthani folklore, traditional turban tying competitions, cobalt-blue street parades, and floating lamps on Naval Sagar lake.'
+      }
+    };
+
+    const MONTH_NAMES = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    window.render2DCalendar = function() {
+      const grid = document.getElementById('calendarDatesGrid');
+      const label = document.getElementById('calCurrentMonthLabel');
+      if (!grid || !label) return;
+
+      label.innerText = `${MONTH_NAMES[window.currentCalMonth]} ${window.currentCalYear}`;
+      grid.innerHTML = '';
+
+      const firstDay = new Date(window.currentCalYear, window.currentCalMonth, 1).getDay();
+      const totalDays = new Date(window.currentCalYear, window.currentCalMonth + 1, 0).getDate();
+
+      // Empty lead days for starting alignment
+      for (let i = 0; i < firstDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = "h-9 sm:h-11 rounded-xl";
+        grid.appendChild(emptyCell);
+      }
+
+      // Populate month days
+      for (let d = 1; d <= totalDays; d++) {
+        const cell = document.createElement('div');
+        
+        // Find if this day has an event
+        const matchingEvent = Object.values(window.FESTIVAL_DETAILS).find(
+          ev => ev.day === d && ev.month === window.currentCalMonth && ev.year === window.currentCalYear
+        );
+
+        if (matchingEvent) {
+          // Highlighted Green Active Festival Date
+          cell.className = "h-9 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 transition relative ring-2 ring-emerald-300";
+          cell.innerHTML = `
+            <span>${d}</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-300 mt-0.5"></span>
+          `;
+          cell.onclick = () => window.selectCalendarFestival(matchingEvent.id);
+        } else {
+          // Regular Day
+          cell.className = "h-9 sm:h-11 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center transition";
+          cell.innerHTML = `<span>${d}</span>`;
+        }
+
+        grid.appendChild(cell);
+      }
+    };
+
+    window.changeCalendarMonth = function(direction) {
+      window.currentCalMonth += direction;
+      if (window.currentCalMonth > 11) {
+        window.currentCalMonth = 0;
+        window.currentCalYear++;
+      } else if (window.currentCalMonth < 0) {
+        window.currentCalMonth = 11;
+        window.currentCalYear--;
+      }
+      window.render2DCalendar();
+    };
+
+    window.selectCalendarFestival = function(eventId) {
+      window.currentSelectedEventId = eventId;
+      const ev = window.FESTIVAL_DETAILS[eventId];
+      if (!ev) return;
+
+      // Update Quick Banner below Calendar
+      const bannerTitle = document.getElementById('quickBannerTitle');
+      const bannerTag = document.getElementById('quickBannerTag');
+      if (bannerTitle) bannerTitle.innerText = `${ev.name} (${ev.city.split(',')[0]}) • ${ev.dateStr}`;
+      if (bannerTag) bannerTag.innerText = ev.tag;
+
+      // Open Spotlight Modal
+      window.openFestivalSpotlightModal(eventId);
+    };
+
+    // Spotlight Modal Controls
+    window.openFestivalSpotlightModal = function(eventId) {
+      const ev = window.FESTIVAL_DETAILS[eventId] || window.FESTIVAL_DETAILS['varanasi'];
+      window.currentSelectedEventId = ev.id;
+
+      const imgEl = document.getElementById('spotlightModalImg');
+      const titleEl = document.getElementById('spotlightModalTitle');
+      const locEl = document.getElementById('spotlightModalLocation');
+      const dateEl = document.getElementById('spotlightModalDate');
+      const tagEl = document.getElementById('spotlightModalTag');
+      const pitchEl = document.getElementById('spotlightModalPitch');
+      const bestEl = document.getElementById('spotlightModalBestTime');
+      const budgetEl = document.getElementById('spotlightModalBudget');
+
+      if (imgEl) imgEl.src = ev.img;
+      if (titleEl) titleEl.innerText = ev.name;
+      if (locEl) locEl.innerHTML = `<i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-400"></i> ${ev.city}`;
+      if (dateEl) dateEl.innerText = ev.dateStr;
+      if (tagEl) tagEl.innerText = ev.tag;
+      if (pitchEl) pitchEl.innerText = ev.pitch;
+      if (bestEl) bestEl.innerText = ev.bestTime;
+      if (budgetEl) budgetEl.innerText = ev.budget;
+
+      const modal = document.getElementById('festivalSpotlightModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    window.closeFestivalSpotlightModal = function() {
+      const modal = document.getElementById('festivalSpotlightModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    // Jump to Home Feed Card
+    window.spotlightJumpToFeed = function() {
+      window.closeFestivalSpotlightModal();
+      window.switchTab('home');
+
+      const searchInput = document.getElementById('destinationSearch');
+      const ev = window.FESTIVA
+      
+      L_DETAILS[window.currentSelectedEventId];
+      if (searchInput && ev) {
+        searchInput.value = ev.city.split(',')[0];
+        window.filterDestinations();
+      }
+
+      const feed = document.getElementById('destinationsFeedList');
+      if (feed) {
+        feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    // Direct Plan Trip Jump
+    window.spotlightStartPlanner = function() {
+      window.closeFestivalSpotlightModal();
+      const ev = window.FESTIVAL_DETAILS[window.currentSelectedEventId];
+      if (ev && window.startPlannerFor) {
+        window.startPlannerFor(ev.id);
+      }
+    };
+
+
+    // STORIES LOGIC
+    window.STORY_ITEMS = [
+      { id: "varanasi", title: "Dev Deepawali on 84 Ghats", sub: "Varanasi, UP", date: "24 November", img: "https://images.unsplash.com/photo-1571536802807-30451e3955d8?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800&auto=format&fit=crop&q=80", caption: "Fast 8-hour Vande Bharat. Book evening boats from Assi to Dashashwamedh for full illumination views." },
+      { id: "pushkar", title: "Pushkar Camel Fair", sub: "Pushkar, RJ", date: "17 - 24 November", img: "78147.jpg", fallback: "https://images.unsplash.com/photo-1509744645300-a2098b11871a?w=800&auto=format&fit=crop&q=80", caption: "Ajmer Shatabdi + 20-min bus. Sunrise photography with traditional camel carts in desert dunes." },
+      { id: "bundi", title: "Bundi Fort Heritage", sub: "Bundi, RJ", date: "27 Nov - 3 Dec", img: "78146.jpg", fallback: "https://images.unsplash.com/photo-1609137144813-7d9921338f24?w=800&auto=format&fit=crop&q=80", caption: "Cobalt blue alleys, authentic havelis, and massive Taragarh ramparts away from crowds." },
+      { id: "chhath", title: "Chhath Puja Mahaparv", sub: "Patna & Bodh Gaya", date: "13 - 16 November", img: "78144.jpg", fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800&auto=format&fit=crop&q=80", caption: "Overnight express trains directly from Delhi. Witness divine sunrise arghya rituals on sacred Ganga ghats." },
+      { id: "hornbill", title: "Hornbill Festival", sub: "Nagaland", date: "1 - 10 December", img: "78145.jpg", fallback: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&auto=format&fit=crop&q=80", caption: "Transit via Dimapur + shared taxi to Kohima. Make sure to apply for your online ILP permit." }
+    ];
+
+    window.openStory = function(idx) {
+      window.currentStoryIndex = idx;
+      const modal = document.getElementById('storyViewerModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      window.renderStory();
+    };
+
+    window.closeStory = function() {
+      clearInterval(window.storyTimer);
+      const modal = document.getElementById('storyViewerModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+
+    window.renderStory = function() {
+      clearInterval(window.storyTimer);
+      const s = window.STORY_ITEMS[window.currentStoryIndex];
+      const pc = document.getElementById('storyProgressContainer');
+      pc.innerHTML = window.STORY_ITEMS.map((_, i) => `<div class="story-progress-bg"><div id="progBar_${i}" class="story-progress-fill" style="width:${i < window.currentStoryIndex ? '100%' : '0%'}"></div></div>`).join('');
+      document.getElementById('storyHeaderTitle').innerText = s.title;
+      document.getElementById('storyHeaderSub').innerText = s.sub;
+      document.getElementById('storyBadge').innerText = s.date;
+      document.getElementById('storyCaptionTitle').innerText = s.title;
+      document.getElementById('storyCaptionText').innerText = s.caption;
+      const img = document.getElementById('storyMainImage');
+      img.src = s.img;
+      img.onerror = function() { this.src = s.fallback; };
+      const headImg = document.getElementById('storyHeaderImg');
+      headImg.src = s.img;
+      headImg.onerror = function() { this.src = s.fallback; };
+
+      let elapsed = 0;
+      const activeBar = document.getElementById(`progBar_${window.currentStoryIndex}`);
+      window.storyTimer = setInterval(() => {
+        elapsed += 100;
+        if (activeBar) activeBar.style.width = Math.min((elapsed / 5000) * 100, 100) + '%';
+        if (elapsed >= 5000) window.nextStory();
+      }, 100);
+    };
+
+    window.nextStory = function() {
+      if (window.currentStoryIndex < window.STORY_ITEMS.length - 1) {
+        window.currentStoryIndex++;
+        window.renderStory();
+      } else {
+        window.closeStory();
+      }
+    };
+
+    window.prevStory = function() {
+      if (window.currentStoryIndex > 0) {
+        window.currentStoryIndex--;
+        window.renderStory();
+      } else {
+        window.closeStory();
+      }
+    };
+
+    window.planFromStory = function() {
+      const s = window.STORY_ITEMS[window.currentStoryIndex];
+      window.closeStory();
+      window.startPlannerFor(s.id);
+    };
+
+    // BUDGET MEME ROAST
+    window.updateMinBudgetHint = function() {
+      const sel = document.getElementById('calcCitySelect');
+      const min = sel.options[sel.selectedIndex].getAttribute('data-min');
+      document.getElementById('calcMinHint').innerText = `Minimum realistic budget: ₹${min}`;
+    };
+
+    window.checkBudgetMeme = function() {
+      const sel = document.getElementById('calcCitySelect');
+      const minVal = parseInt(sel.options[sel.selectedIndex].getAttribute('data-min')) || 2500;
+      const userVal = parseInt(document.getElementById('calcBudgetInput').value) || 0;
+      if (userVal < minVal) {
+        document.getElementById('memeModal').classList.remove('hidden');
+        document.getElementById('memeModal').classList.add('flex');
+      } else {
+        document.getElementById('budgetResultBox').classList.remove('hidden');
+        document.getElementById('splitTransit').innerText = '₹' + Math.round(userVal * 0.20);
+        document.getElementById('splitStay').innerText = '₹' + Math.round(userVal * 0.35);
+        document.getElementById('splitFood').innerText = '₹' + Math.round(userVal * 0.35);
+        document.getElementById('splitBuffer').innerText = '₹' + Math.round(userVal * 0.10);
+      }
+    };
+
+    window.fixBudgetAuto = function() {
+      document.getElementById('calcBudgetInput').value = "3500";
+      window.closeMemeModal();
+      window.checkBudgetMeme();
+    };
+
+    window.closeMemeModal = function() {
+      document.getElementById('memeModal').classList.add('hidden');
+      document.getElementById('memeModal').classList.remove('flex');
+    };
+
+    window.editProfileModal = function() {
+      const newName = prompt("Enter your name:", window.currentUser ? window.currentUser.name : "Deepak Explorer");
+      if (newName) {
+        if (!window.currentUser) window.currentUser = { contact: "+91 9876543210" };
+        window.currentUser.name = newName;
+        document.getElementById('drawerUserName').innerText = newName;
+      }
+    };
+
+    window.setCurrentLocationPrompt = function() {
+      const loc = prompt("Enter your departure city (e.g., Delhi NCR, Gurugram, Jaipur):", "Delhi NCR / Gurugram");
+      if (loc) {
+        document.getElementById('routeFromInput').value = loc;
+        alert("Departure origin updated to: " + loc);
+      }
+    };
+
+    // ON DOM LOAD INITIALIZATION
+    window.addEventListener('DOMContentLoaded', () => {
+            // Bidirectional Route Input Bindings
+      const homeFrom = document.getElementById('routeFromInput');
+      const homeTo = document.getElementById('routeToInput');
+      const bookFrom = document.getElementById('gvelFrom');
+      const bookTo = document.getElementById('gvelTo');
+
+      if (homeFrom) {
+        homeFrom.addEventListener('input', (e) => window.syncGlobalRoute(e.target.value, null, 'homeFrom'));
+      }
+      if (homeTo) {
+        homeTo.addEventListener('input', (e) => window.syncGlobalRoute(null, e.target.value, 'homeTo'));
+      }
+      if (bookFrom) {
+        bookFrom.addEventListener('input', (e) => window.syncGlobalRoute(e.target.value, null, 'bookFrom'));
+      }
+      if (bookTo) {
+        bookTo.addEventListener('input', (e) => window.syncGlobalRoute(null, e.target.value, 'bookTo'));
+      }
+
+      // Initial route synchronization on page load
+      const initialFrom = homeFrom ? homeFrom.value : 'Delhi NCR';
+      const initialTo = homeTo ? homeTo.value : 'Varanasi';
+      window.syncGlobalRoute(initialFrom, initialTo, 'init');
+
+      window.renderFeed();
+      window.renderPlannerCityGrid(); // LOAD STEP 1 CARDS IMMEDIATELY
+      window.updateSavedCountBadge();
+      window.renderFestivalCalendar();
+      if (window.lucide) window.lucide.createIcons();
+    });
+    // ========================================================
+// STEP 4 CONTROLLER (DUAL MODE, SEARCH, ROW TABS & NAV)
+// ========================================================
+
+// 1. Dual Mode Controller: Car/Bike vs Airways/Transit Hub
+window.renderStep4ByTransportMode = function(transportType) {
+  const roadTripSec = document.getElementById('plannerRoadTripSection');
+  const transitHubSec = document.getElementById('plannerAirwaysTransitHub');
+  const navBtn = document.getElementById('gmapsDirectNavBtn');
+  const destName = (window.plannerState && (window.plannerState.destName || window.plannerState.selectedDestination)) || 'Destination';
+  const originName = (window.plannerState && window.plannerState.origin) || 'Your City';
+
+  const isRoadTrip = (transportType === '4wheeler' || transportType === '2wheeler' || transportType === 'car' || transportType === 'bike');
+
+  if (isRoadTrip) {
+    if (roadTripSec) roadTripSec.classList.remove('hidden');
+    if (transitHubSec) transitHubSec.classList.add('hidden');
+
+    if (navBtn) {
+      navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destName)}`;
+    }
+
+    const distBadge = document.getElementById('roadTripDistanceBadge');
+    if (distBadge) {
+      distBadge.innerText = `${originName} ➔ ${destName} Active Route`;
+    }
+
+    if (window.directRouteLeaflet) {
+      setTimeout(() => window.directRouteLeaflet.invalidateSize(), 200);
+    }
+    
+    // Default Road Category to Dhabas
+    window.switchRoadCategory('dhabas');
+  } else {
+    // Airways, Rails & Transit Hub (NO MAP)
+    if (roadTripSec) roadTripSec.classList.add('hidden');
+    if (transitHubSec) transitHubSec.classList.remove('hidden');
+
+    const heroTitle = document.getElementById('transitHeroTitle');
+    if (heroTitle) {
+      heroTitle.innerText = `${destName} Connectivity & Local Essentials`;
+    }
+
+    window.switchTransitHubTab('transport');
+  }
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+};
+
+// 2. Road Trip Category Switcher (Dhabas, Stays, Secrets)
+window.switchRoadCategory = function(catName) {
+  const cats = ['dhabas', 'stays', 'secrets'];
+  cats.forEach(c => {
+    const btn = document.getElementById(`roadSecBtn-${c}`);
+    const content = document.getElementById(`roadContent-${c}`);
+    if (c === catName) {
+      if (content) content.classList.remove('hidden');
+      if (btn) {
+        btn.className = 'px-3.5 py-2 text-xs font-black rounded-xl bg-slate-900 text-white transition flex items-center gap-1.5 shadow-sm';
+      }
+    } else {
+      if (content) content.classList.add('hidden');
+      if (btn) {
+        btn.className = 'px-3.5 py-2 text-xs font-black rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5';
+      }
+    }
+  });
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+};
+
+// 3. Hub Tab Switcher for Airways/Rails (Transport, Hotels, Secrets, Guiders)
+window.switchTransitHubTab = function(tabName) {
+  const tabs = ['transport', 'hotels', 'secrets', 'guiders'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`transitHubBtn-${t}`);
+    const content = document.getElementById(`transitContent-${t}`);
+    if (t === tabName) {
+      if (content) content.classList.remove('hidden');
+      if (btn) {
+        btn.classList.add('bg-white', 'text-emerald-700', 'shadow-sm');
+        btn.classList.remove('text-slate-600');
+      }
+    } else {
+      if (content) content.classList.add('hidden');
+      if (btn) {
+        btn.classList.remove('bg-white', 'text-emerald-700', 'shadow-sm');
+        btn.classList.add('text-slate-600');
+      }
+    }
+  });
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+};
+
+// 4. Sub-Transport Filter (All, Flight, Train, Bus, Cab)
+window.filterSubTransport = function(mode) {
+  const buttons = ['all', 'flight', 'train', 'bus', 'cab'];
+  buttons.forEach(b => {
+    const btn = document.getElementById(`subTransBtn-${b}`);
+    if (btn) {
+      if (b === mode) {
+        btn.className = 'sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-slate-900 text-white';
+      } else {
+        btn.className = 'sub-trans-btn px-4 py-1.5 text-xs font-bold rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-emerald-500';
+      }
+    }
+  });
+
+  const items = document.querySelectorAll('.trans-item');
+  items.forEach(el => {
+    if (mode === 'all' || el.getAttribute('data-mode') === mode) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  });
+};
+
+// 5. Road Map Search Bar Logic
+window.searchRoadTripStops = function() {
+  const query = document.getElementById('roadTripMapSearchInput').value.trim();
+  if (!query) return;
+  alert(`Searching route amenities for: "${query}"`);
+};
+
+// 6. Connect with Step 3 Click Trigger
+const originalSelectTransport = window.selectPlannerTransport;
+window.selectPlannerTransport = function(type) {
+  if (originalSelectTransport) {
+    try { originalSelectTransport(type); } catch(e) {}
+  }
+  if (window.plannerState) {
+    window.plannerState.transport = type;
+  }
+  window.renderStep4ByTransportMode(type);
+  if (window.goToPlannerStep) {
+    window.goToPlannerStep(4);
+  }
+};
+// ==========================================================
+// STEP 4 LEAFLET ROUTE MAP ENGINE (CAR & BIKE LIVE ROUTE)
+// ==========================================================
+window.initDirectRoadTripMap = function() {
+  const mapContainer = document.getElementById('directRouteMap');
+  if (!mapContainer) return;
+
+  // 1. Coordinates: Delhi (Origin Default) to Varanasi (Dev Deepawali)
+  const originLat = 28.6139, originLng = 77.2090; // Delhi
+  const destLat = 25.3176, destLng = 82.9739;    // Varanasi
+
+  // Agar map pehle se bana hai toh refresh karein, naya na banayein
+  if (window.directRouteLeaflet) {
+    window.directRouteLeaflet.invalidateSize();
+    return;
+  }
+
+  // 2. Leaflet Map Initialize karein
+  window.directRouteLeaflet = L.map('directRouteMap', {
+    zoomControl: true,
+    scrollWheelZoom: false
+  }).setView([(originLat + destLat) / 2, (originLng + destLng) / 2], 6);
+
+  // 3. 100% Free Esri World Street Map Tiles
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 18,
+    attribution: 'Tiles &copy; Esri'
+  }).addTo(window.directRouteLeaflet);
+
+  // 4. Origin & Destination Markers
+  const originMarker = L.circleMarker([originLat, originLng], {
+    radius: 7,
+    fillColor: '#059669',
+    color: '#ffffff',
+    weight: 2,
+    fillOpacity: 1
+  }).addTo(window.directRouteLeaflet).bindPopup('<b>Starting Point</b><br>Your Origin');
+
+  const destMarker = L.circleMarker([destLat, destLng], {
+    radius: 8,
+    fillColor: '#dc2626',
+    color: '#ffffff',
+    weight: 2,
+    fillOpacity: 1
+  }).addTo(window.directRouteLeaflet).bindPopup('<b>Varanasi</b><br>Dev Deepawali Hub').openPopup();
+
+  // 5. Emerald Route Line (NH-19 Highway Simulator)
+  const routePoints = [
+    [originLat, originLng],
+    [27.1767, 78.0081], // Agra
+    [26.4499, 80.3319], // Kanpur
+    [25.4358, 81.8463], // Prayagraj
+    [destLat, destLng]   // Varanasi
+  ];
+
+  const polyline = L.polyline(routePoints, {
+    color: '#059669',
+    weight: 4,
+    opacity: 0.85,
+    dashArray: '8, 8',
+    lineCap: 'round'
+  }).addTo(window.directRouteLeaflet);
+
+  // Map ko dono points ke hisab se fit karein
+  window.directRouteLeaflet.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+
+  // 6. Distance & Driving Time Badges Update Karein
+  const distBadge = document.getElementById('roadTripDistanceBadge');
+  const timeBadge = document.getElementById('roadTripTimeBadge');
+  if (distBadge) distBadge.innerText = '820 km via NH-19';
+  if (timeBadge) timeBadge.innerText = 'Approx 12 hr 45 min';
+
+  // 7. Free Turn-by-Turn Google Maps Button Link
+  const gmapsBtn = document.getElementById('gmapsDirectNavBtn');
+  if (gmapsBtn) {
+    gmapsBtn.href = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
+  }
+};
+
+// 8. Mode Switcher Mein Is Map Function Ko Call Karein
+const existingRenderStep4 = window.renderStep4ByTransportMode;
+window.renderStep4ByTransportMode = function(type) {
+  if (existingRenderStep4) {
+    try { existingRenderStep4(type); } catch(e) {}
+  }
+  
+  if (type === '4wheeler' || type === '2wheeler' || type === 'car' || type === 'bike') {
+    // Map container ko render hone ke liye 250ms ka time dein
+    setTimeout(() => {
+      window.initDirectRoadTripMap();
+      if (window.directRouteLeaflet) {
+        window.directRouteLeaflet.invalidateSize();
+      }
+    }, 250);
+  }
+};
+    // ============================================================
+    // GVEL SMART BOOKING HUB & DYNAMIC ROUTE ENGINE
+    // ============================================================
+    window.currentBookingCategory = 'train';
+
+    // Provider Catalogs with Dynamic Link Generators
+    window.BOOKING_PROVIDERS = {
+      train: [
+        {
+          name: "IRCTC Official Portal",
+          desc: "Official Indian Railways ticket & Tatkal booking system",
+          icon: "🚆",
+          tag: "Official 0% Fee",
+          tagColor: "bg-emerald-50 text-emerald-800",
+          linkType: "irctc"
+        },
+        {
+          name: "ConfirmTkt (Tatkal Predictor)",
+          desc: "Live seat availability, alternate train routes & Tatkal confirmation",
+          icon: "🎟️",
+          tag: "Tatkal Chance 95%",
+          tagColor: "bg-teal-50 text-teal-800",
+          linkType: "confirmtkt"
+        },
+        {
+          name: "MakeMyTrip Trains",
+          desc: "Zero cancellation charge guarantee & free seat selection",
+          icon: "🚆",
+          tag: "Instant Refund",
+          tagColor: "bg-sky-50 text-sky-800",
+          linkType: "mmt_train"
+        },
+        {
+          name: "ixigo Trains",
+          desc: "Live train running status, platform locator & berth layout",
+          icon: "⚡",
+          tag: "Live PNR Tracker",
+          tagColor: "bg-blue-50 text-blue-800",
+          linkType: "ixigo_train"
+        }
+      ],
+      flight: [
+        {
+          name: "Google Flights",
+          desc: "Real-time calendar comparing lowest airfares across all airlines",
+          icon: "✈️",
+          tag: "Cheapest Calendar",
+          tagColor: "bg-sky-50 text-sky-800",
+          linkType: "google_flights"
+        },
+        {
+          name: "MakeMyTrip Flights",
+          desc: "Instant student & senior citizen discounts with bank offers",
+          icon: "🛫",
+          tag: "Bank Offers Up to ₹1,500",
+          tagColor: "bg-indigo-50 text-indigo-800",
+          linkType: "mmt_flight"
+        },
+        {
+          name: "EaseMyTrip Direct",
+          desc: "Zero convenience fee on domestic flight tickets",
+          icon: "✈️",
+          tag: "₹0 Convenience Fee",
+          tagColor: "bg-emerald-50 text-emerald-800",
+          linkType: "easemytrip"
+        }
+      ],
+      bus: [
+        {
+          name: "redBus Official",
+          desc: "India's largest Volvo, AC sleeper & state transport booking network",
+          icon: "🚌",
+          tag: "Live Bus Tracking",
+          tagColor: "bg-rose-50 text-rose-800",
+          linkType: "redbus"
+        },
+        {
+          name: "AbhiBus",
+          desc: "Verified bus operators, free cancellation & charging points",
+          icon: "🚎",
+          tag: "Free Seat Selection",
+          tagColor: "bg-amber-50 text-amber-800",
+          linkType: "abhibus"
+        },
+        {
+          name: "Zingbus Premium Lounges",
+          desc: "Luxury AC sleeper buses with private waiting lounges & onboard air purifier",
+          icon: "🛋️",
+          tag: "Premium AC Lounge",
+          tagColor: "bg-purple-50 text-purple-800",
+          linkType: "zingbus"
+        }
+      ],
+      cab: [
+        {
+          name: "Uber Outstation & Intercity",
+          desc: "Reliable one-way or round-trip outstation cabs with verified drivers",
+          icon: "🚕",
+          tag: "Doorstep Pickup",
+          tagColor: "bg-slate-100 text-slate-800",
+          linkType: "uber"
+        },
+        {
+          name: "Ola Outstation",
+          desc: "AC sedans & SUVs for long-distance highway travel with live GPS",
+          icon: "🚖",
+          tag: "Top Rated Cabs",
+          tagColor: "bg-amber-50 text-amber-800",
+          linkType: "ola"
+        },
+        {
+          name: "Zoomcar Self-Drive",
+          desc: "Drive yourself on holidays. Wide range of hatchbacks, sedans & SUVs",
+          icon: "🚗",
+          tag: "Unlimited Kilometers",
+          tagColor: "bg-emerald-50 text-emerald-800",
+          linkType: "zoomcar"
+        }
+      ],
+      hotel: [
+        {
+          name: "Booking.com Official",
+          desc: "Global hotel chain with free cancellation and verified traveler reviews",
+          icon: "🏨",
+          tag: "Pay at Property",
+          tagColor: "bg-sky-50 text-sky-800",
+          linkType: "booking"
+        },
+        {
+          name: "OYO Budget Stays & Townhouse",
+          desc: "Budget AC rooms near major bus stands and railway stations",
+          icon: "🛏️",
+          tag: "Starting ₹699",
+          tagColor: "bg-rose-50 text-rose-800",
+          linkType: "oyo"
+        },
+        {
+          name: "Zostel Backpacker Hostels",
+          desc: "Social dorm beds, private rooms & rooftop cafes for young explorers",
+          icon: "🎒",
+          tag: "Top Solo Backpacker Pick",
+          tagColor: "bg-amber-50 text-amber-800",
+          linkType: "zostel"
+        }
+      ],
+      food: [
+        {
+          name: "IRCTC eCatering (Food on Track)",
+          desc: "Order hot restaurant meals from Haldiram, Domino's, etc. directly to your train berth",
+          icon: "🍱",
+          tag: "Delivery at Your Train Seat",
+          tagColor: "bg-orange-50 text-orange-800",
+          linkType: "irctc_food"
+        },
+        {
+          name: "Zomato Highway & Station Pick",
+          desc: "Explore top-rated local food joints, sweet shops & restaurants in destination",
+          icon: "🍲",
+          tag: "Locals Top Choice",
+          tagColor: "bg-rose-50 text-rose-800",
+          linkType: "zomato"
+        },
+        {
+          name: "Highway Grand Dhaba Finder",
+          desc: "Locate verified 24/7 highway dhabas with clean family washrooms on Google Maps",
+          icon: "☕",
+          tag: "Kulhad Chai & Parathas",
+          tagColor: "bg-emerald-50 text-emerald-800",
+          linkType: "dhaba_maps"
+        }
+      ]
+    };
+
+    // Category Selector
+    window.setBookingCategory = function(cat) {
+      window.currentBookingCategory = cat;
+      const categories = ['train', 'flight', 'bus', 'cab', 'hotel', 'food'];
+      
+      const categoryNames = {
+        train: 'Showing Trains (IRCTC & Tatkal)',
+        flight: 'Showing Flights & Low-Fare Portals',
+        bus: 'Showing Volvo & Intercity Buses',
+        cab: 'Showing Cabs & Self-Drive Rentals',
+        hotel: 'Showing Hostels, OYO & Hotels',
+        food: 'Showing Restaurants & Station Meals'
+      };
+
+      const hintEl = document.getElementById('activeCategoryHint');
+      if (hintEl) hintEl.innerText = categoryNames[cat] || 'Showing Options';
+
+      categories.forEach(c => {
+        const btn = document.getElementById(`bookCatBtn-${c}`);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-slate-900 text-white shadow-sm';
+          } else {
+            btn.className = 'booking-cat-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition bg-white border border-slate-200 text-slate-700 hover:border-emerald-500 hover:text-emerald-700';
+          }
+        }
+      });
+
+      window.renderBookingCards();
+    };
+
+    // Render Dynamic Cards with Smart Route
+    window.renderBookingCards = function() {
+      const container = document.getElementById('bookingCardsContainer');
+      if (!container) return;
+
+      const fromVal = (document.getElementById('gvelFrom')?.value || 'Delhi').trim();
+      const toVal = (document.getElementById('gvelTo')?.value || 'Varanasi').trim();
+
+      const items = window.BOOKING_PROVIDERS[window.currentBookingCategory] || window.BOOKING_PROVIDERS.train;
+
+      container.innerHTML = items.map(p => `
+        <article class="bg-white border border-slate-200 hover:border-emerald-500 rounded-2xl p-4 shadow-xs hover:shadow-md transition flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-2xl">${p.icon}</span>
+              <span class="text-[10px] font-black px-2 py-0.5 rounded-md ${p.tagColor}">
+                ${p.tag}
+              </span>
+            </div>
+            <h4 class="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition">${p.name}</h4>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">${p.desc}</p>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <span class="text-[11px] font-bold text-slate-400 truncate max-w-[150px]">
+              ${fromVal} ➔ ${toVal}
+            </span>
+            <button 
+              type="button" 
+              onclick="window.openSmartBooking('${p.linkType}')" 
+              class="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0"
+            >
+              <span>Book ↗</span>
+            </button>
+          </div>
+        </article>
+      `).join('');
+
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    // Smart Deep-Link Redirection Engine
+    window.openSmartBooking = function(linkType) {
+      const from = encodeURIComponent((document.getElementById('gvelFrom')?.value || 'Delhi').trim());
+      const to = encodeURIComponent((document.getElementById('gvelTo')?.value || 'Varanasi').trim());
+      const date = document.getElementById('gvelDate')?.value || '';
+
+      let targetUrl = 'https://www.irctc.co.in';
+
+      switch (linkType) {
+        case 'irctc':
+          targetUrl = 'https://www.irctc.co.in/nget/train-search';
+          break;
+        case 'confirmtkt':
+          targetUrl = `https://www.confirmtkt.com/rts/#/trains/${from}/${to}`;
+          break;
+        case 'mmt_train':
+          targetUrl = `https://www.makemytrip.com/railways/listing?srcCity=${from}&destCity=${to}`;
+          break;
+        case 'ixigo_train':
+          targetUrl = `https://www.ixigo.com/trains/${from}-to-${to}`;
+          break;
+        case 'google_flights':
+          targetUrl = `https://www.google.com/travel/flights?q=flights+from+${from}+to+${to}`;
+          break;
+        case 'mmt_flight':
+          targetUrl = `https://www.makemytrip.com/flights/`;
+          break;
+        case 'easemytrip':
+          targetUrl = `https://www.easemytrip.com/flights.html`;
+          break;
+        case 'redbus':
+          targetUrl = `https://www.redbus.in/bus-tickets/${from}-to-${to}`;
+          break;
+        case 'abhibus':
+          targetUrl = `https://www.abhibus.com/`;
+          break;
+        case 'zingbus':
+          targetUrl = `https://www.zingbus.com/`;
+          break;
+        case 'uber':
+          targetUrl = `https://m.uber.com/`;
+          break;
+        case 'ola':
+          targetUrl = `https://www.olacabs.com/`;
+          break;
+        case 'zoomcar':
+          targetUrl = `https://www.zoomcar.com/`;
+          break;
+        case 'booking':
+          targetUrl = `https://www.booking.com/searchresults.html?ss=${to}`;
+          break;
+        case 'oyo':
+          targetUrl = `https://www.oyorooms.com/`;
+          break;
+        case 'zostel':
+          targetUrl = `https://www.zostel.com/`;
+          break;
+        case 'irctc_food':
+          targetUrl = `https://www.ecatering.irctc.co.in/`;
+          break;
+        case 'zomato':
+          targetUrl = `https://www.zomato.com/`;
+          break;
+        case 'dhaba_maps':
+          targetUrl = `https://www.google.com/maps/search/?api=1&query=${to}+Highway+Grand+Dhaba+Family+Restaurant`;
+          break;
+        default:
+          targetUrl = 'https://www.makemytrip.com/';
+      }
+
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    // The Form Action Button Handler
+    window.searchAllProviders = function() {
+      const from = (document.getElementById('gvelFrom')?.value || '').trim();
+      const to = (document.getElementById('gvelTo')?.value || '').trim();
+
+      if (!from || !to) {
+        alert('Please enter both Departure City and Destination!');
+        return;
+      }
+
+      const btnText = document.getElementById('bookingSearchBtnText');
+      if (btnText) {
+        const orig = btnText.innerText;
+        btnText.innerText = `Connecting ${from} ➔ ${to}... ✓`;
+        setTimeout(() => { btnText.innerText = orig; }, 1500);
+      }
+
+      window.renderBookingCards();
+
+      // Smooth scroll to comparison cards
+      const container = document.getElementById('bookingCardsContainer');
+      if (container) {
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    };
+
+    // Auto-init on load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set today or tomorrow as default date
+      const dateEl = document.getElementById('gvelDate');
+      if (dateEl && !dateEl.value) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        dateEl.value = tomorrow.toISOString().split('T')[0];
+      }
+
+      if (window.renderBookingCards) {
+        window.renderBookingCards();
+      }
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "1.0",
+  "note": "Starter data structure only. Verify dates against official festival/tourism sources before publishing; dates can vary by lunar calendar and local announcements.",
+  "festivals": [
+    {
+      "id": "dev-deepawali-varanasi",
+      "name": "Dev Deepawali",
+      "destination": "Varanasi, Uttar Pradesh",
+      "country": "India",
+      "dateType": "lunar-calendar",
+      "startDate": null,
+      "endDate": null,
+      "dateStatus": "needs_official_confirmation",
+      "destinationCoordinates": {
+        "lat": 25.3176,
+        "lng": 82.9739
+      },
+      "tags": [
+        "lights",
+        "culture",
+        "riverfront"
+      ],
+      "estimatedBudgetINR": {
+        "min": 3500,
+        "max": 6500
+      },
+      "sourceUrl": null
+    },
+    {
+      "id": "pushkar-camel-fair",
+      "name": "Pushkar Camel Fair",
+      "destination": "Pushkar, Rajasthan",
+      "country": "India",
+      "dateType": "annual-event-dates",
+      "startDate": null,
+      "endDate": null,
+      "dateStatus": "needs_official_confirmation",
+      "destinationCoordinates": {
+        "lat": 26.4897,
+        "lng": 74.5511
+      },
+      "tags": [
+        "culture",
+        "fair",
+        "desert"
+      ],
+      "estimatedBudgetINR": {
+        "min": 3000,
+        "max": 7000
+      },
+      "sourceUrl": null
+    },
+    {
+      "id": "chhath-puja",
+      "name": "Chhath Puja",
+      "destination": "Patna, Bihar",
+      "country": "India",
+      "dateType": "lunar-calendar",
+      "startDate": null,
+      "endDate": null,
+      "dateStatus": "needs_official_confirmation",
+      "destinationCoordinates": {
+        "lat": 25.5941,
+        "lng": 85.1376
+      },
+      "tags": [
+        "religious",
+        "riverfront",
+        "culture"
+      ],
+      "estimatedBudgetINR": {
+        "min": 2000,
+        "max": 4500
+      },
+      "sourceUrl": null
+    },
+    {
+      "id": "hornbill-festival",
+      "name": "Hornbill Festival",
+      "destination": "Kisama, Nagaland",
+      "country": "India",
+      "dateType": "annual-event-dates",
+      "startDate": null,
+      "endDate": null,
+      "dateStatus": "needs_official_confirmation",
+      "destinationCoordinates": {
+        "lat": 25.6751,
+        "lng": 94.1086
+      },
+      "tags": [
+        "tribal-culture",
+        "music",
+        "food"
+      ],
+      "estimatedBudgetINR": {
+        "min": 8000,
+        "max": 15000
+      },
+      "sourceUrl": null
+    }
+  ]
+}
