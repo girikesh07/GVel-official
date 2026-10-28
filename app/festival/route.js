@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+// '@/lib/supabase' ke bajaye seedha relative path (0% Webpack Crash)
+import { supabase } from '../../lib/supabase';
 
-// Fallback Festival Data agar database offline ho
+// Static compilation bypass
+export const dynamic = 'force-dynamic';
+
 const fallbackFestivals = [
   {
     id: "varanasi",
