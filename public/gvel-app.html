@@ -161,7 +161,7 @@ fetch('/festival')
   <!-- ========================================== -->
   <!-- 1. AUTHENTICATION POPUP                    -->
   <!-- ========================================== -->
-  <div id="authScreen" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col justify-center items-center p-4 overflow-y-auto">
+  <div id="authScreen" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col justify-center items-center p-4 overflow-y-auto">
     <div class="w-full max-w-sm sm:max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto">
       <div class="text-center mb-6">
         <div class="inline-block relative mb-3">
@@ -251,16 +251,28 @@ fetch('/festival')
         </button>
       </nav>
 
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="window.openSavedDrawer()" class="relative p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition flex items-center gap-1.5 font-bold text-xs">
-          <i data-lucide="bookmark" class="w-5 h-5 text-slate-800"></i>
-          <span class="hidden sm:inline">Saved</span>
-          <span id="savedCountBadge" class="bg-emerald-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">3</span>
-        </button>
-        <button type="button" onclick="document.getElementById('profileDrawer').classList.remove('hidden')" class="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition">
-          <i data-lucide="more-vertical" class="w-5 h-5 text-slate-800"></i>
-        </button>
-      </div>
+<div class="flex items-center gap-2">
+
+  <!-- Login Button -->
+  <button
+    type="button"
+    onclick="document.getElementById('authScreen').classList.remove('hidden')"
+    class="px-4 py-2 rounded-xl border border-emerald-600 text-emerald-700 font-bold text-sm hover:bg-emerald-50 transition"
+  >
+    Login
+  </button>
+
+  <!-- Three Dot Menu -->
+  <button
+    type="button"
+    aria-label="Open menu"
+    onclick="document.getElementById('profileDrawer').classList.remove('hidden')"
+    class="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition"
+  >
+    <i data-lucide="more-vertical" class="w-5 h-5"></i>
+  </button>
+
+</div>
     </div>
   </header>
 
@@ -2078,6 +2090,20 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" onclick="window.editProfileModal()" class="w-full flex items-center gap-2.5 p-3 rounded-xl hover:bg-slate-100 text-left"><i data-lucide="user" class="w-4 h-4 text-emerald-600"></i> Edit Profile Info</button>
           <button type="button" onclick="window.setCurrentLocationPrompt()" class="w-full flex items-center gap-2.5 p-3 rounded-xl hover:bg-slate-100 text-left"><i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i> Set Current Location</button>
           <button type="button" onclick="alert('Namaste! GVel Saathi is ready.')" class="w-full flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 text-emerald-800 text-left"><i data-lucide="bot" class="w-4 h-4 text-emerald-600"></i> Chat with GVel Saathi (AI Guide)</button>
+<button
+  type="button"
+  onclick="window.openSavedDrawer()"
+  class="w-full flex items-center gap-2.5 p-3 rounded-xl hover:bg-slate-100 text-left"
+>
+  <i data-lucide="bookmark" class="w-4 h-4 text-emerald-600"></i>
+
+  <span class="flex-1">Saved Items</span>
+
+  <span
+    id="savedCountMenuBadge"
+    class="bg-emerald-600 text-white text-[10px] font-black min-w-5 h-5 px-1 rounded-full flex items-center justify-center"
+  >3</span>
+</button>
         </div>
       </div>
       <button type="button" onclick="window.logoutUser()" class="w-full py-3 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 font-black text-xs rounded-xl transition">Log Out</button>
@@ -2542,10 +2568,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!document.getElementById('savedDrawer').classList.contains('hidden')) window.renderSavedDrawer();
     };
 
-    window.updateSavedCountBadge = function() {
-      const b = document.getElementById('savedCountBadge');
-      if (b) b.innerText = window.savedPlaces.length;
-    };
+window.updateSavedCountBadge = function() {
+  const badge = document.getElementById('savedCountBadge');
+  const menuBadge = document.getElementById('savedCountMenuBadge');
+
+  if (badge) {
+    badge.innerText = window.savedPlaces.length;
+  }
+
+  if (menuBadge) {
+    menuBadge.innerText = window.savedPlaces.length;
+  }
+};
 
     window.openSavedDrawer = function() { window.renderSavedDrawer(); document.getElementById('savedDrawer').classList.remove('hidden'); };
     window.renderSavedDrawer = function() {
