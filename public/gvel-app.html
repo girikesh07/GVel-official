@@ -3598,23 +3598,21 @@ window.renderStep4ByTransportMode = function(type) {
    GVEL - GLOBAL BACK NAVIGATION
    Android Back Gesture / Browser Back
    ========================================== */
-
 (function () {
-    if (window.gvelBackNavigationInitialized) return;
-    window.gvelBackNavigationInitialized = true;
-
-    // Capture visibility of all ID-based UI sections
+    // Save the complete UI state, including active navigation colors
     function getUIState() {
         const state = {};
 
         document.querySelectorAll('[id]').forEach(element => {
-            state[element.id] = element.classList.contains('hidden');
+            state[element.id] = {
+                classAttr: element.getAttribute('class')
+            };
         });
 
         return state;
     }
 
-    // Restore previous visibility state
+    // Restore sections, planner steps and active navigation styles
     function restoreUIState(state) {
         if (!state) return;
 
@@ -3622,7 +3620,15 @@ window.renderStep4ByTransportMode = function(type) {
             const element = document.getElementById(id);
             if (!element) return;
 
-            element.classList.toggle('hidden', state[id]);
+            const saved = state[id];
+
+            if (saved && Object.prototype.hasOwnProperty.call(saved, 'classAttr')) {
+                if (saved.classAttr === null) {
+                    element.removeAttribute('class');
+                } else {
+                    element.setAttribute('class', saved.classAttr);
+                }
+            }
         });
     }
 
@@ -3630,54 +3636,84 @@ window.renderStep4ByTransportMode = function(type) {
         return JSON.stringify(a) !== JSON.stringify(b);
     }
 
-    // Remember UI state before a meaningful click
+    // Initialize the current browser history entry
+    history.replaceState(
+        {
+            ...(history.state || {}),
+            gvelUIState: getUIState()
+        },
+        '',
+        location.href
+    );
+
+    // Capture meaningful UI navigation
     document.addEventListener('click', function (event) {
-        const target = event.target.closest(
+        const clicked = event.target instanceof Element
+            ? event.target
+            : event.target.parentElement;
+
+        if (!clicked) return;
+
+        const target = clicked.closest(
             'button, [onclick], [role="button"], a'
         );
 
         if (!target) return;
 
-        // Ignore external navigation links
-        if (
-            target.tagName === 'A' &&
-            target.getAttribute('href') &&
-            !target.getAttribute('href').startsWith('#') &&
-            !target.getAttribute('href').startsWith('javascript:')
-        ) {
-            return;
+        // Ignore external links
+        if (target.tagName === 'A') {
+            const href = target.getAttribute('href');
+
+            if (
+                href &&
+                !href.startsWith('#') &&
+                !href.startsWith('javascript:')
+            ) {
+                return;
+            }
         }
+
+        // Ignore form fields and ordinary typing
+        if (target.matches('input, textarea, select, option')) return;
 
         const previousState = getUIState();
 
-        // Wait for the existing GVel click handler to finish
+        // Let the existing GVel click handler finish first
         setTimeout(function () {
             const currentState = getUIState();
 
-            if (statesAreDifferent(previousState, currentState)) {
-                history.pushState(
-                    {
-                        gvelBackNavigation: true,
-                        previousUI: previousState
-                    },
-                    '',
-                    location.href
-                );
+            if (!statesAreDifferent(previousState, currentState)) {
+                return;
             }
-        }, 120);
+
+            // Store the state before navigation in the current entry
+            history.replaceState(
+                {
+                    ...(history.state || {}),
+                    gvelUIState: previousState
+                },
+                '',
+                location.href
+            );
+
+            // Create a history entry for the new UI
+            history.pushState(
+                {
+                    ...(history.state || {}),
+                    gvelUIState: currentState
+                },
+                '',
+                location.href
+            );
+
+        }, 180);
 
     }, true);
 
-    // Android / browser Back handling
+    // Android and browser Back / Forward handling
     window.addEventListener('popstate', function (event) {
-        const state = event.state;
-
-        if (
-            state &&
-            state.gvelBackNavigation &&
-            state.previousUI
-        ) {
-            restoreUIState(state.previousUI);
+        if (event.state && event.state.gvelUIState) {
+            restoreUIState(event.state.gvelUIState);
         }
     });
 
