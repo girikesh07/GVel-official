@@ -3594,7 +3594,96 @@ window.renderStep4ByTransportMode = function(type) {
         window.renderBookingCards();
       }
     });
+/* ==========================================
+   GVEL - GLOBAL BACK NAVIGATION
+   Android Back Gesture / Browser Back
+   ========================================== */
 
+(function () {
+    if (window.gvelBackNavigationInitialized) return;
+    window.gvelBackNavigationInitialized = true;
+
+    // Capture visibility of all ID-based UI sections
+    function getUIState() {
+        const state = {};
+
+        document.querySelectorAll('[id]').forEach(element => {
+            state[element.id] = element.classList.contains('hidden');
+        });
+
+        return state;
+    }
+
+    // Restore previous visibility state
+    function restoreUIState(state) {
+        if (!state) return;
+
+        Object.keys(state).forEach(id => {
+            const element = document.getElementById(id);
+            if (!element) return;
+
+            element.classList.toggle('hidden', state[id]);
+        });
+    }
+
+    function statesAreDifferent(a, b) {
+        return JSON.stringify(a) !== JSON.stringify(b);
+    }
+
+    // Remember UI state before a meaningful click
+    document.addEventListener('click', function (event) {
+        const target = event.target.closest(
+            'button, [onclick], [role="button"], a'
+        );
+
+        if (!target) return;
+
+        // Ignore external navigation links
+        if (
+            target.tagName === 'A' &&
+            target.getAttribute('href') &&
+            !target.getAttribute('href').startsWith('#') &&
+            !target.getAttribute('href').startsWith('javascript:')
+        ) {
+            return;
+        }
+
+        const previousState = getUIState();
+
+        // Wait for the existing GVel click handler to finish
+        setTimeout(function () {
+            const currentState = getUIState();
+
+            if (statesAreDifferent(previousState, currentState)) {
+                history.pushState(
+                    {
+                        gvelBackNavigation: true,
+                        previousUI: previousState
+                    },
+                    '',
+                    location.href
+                );
+            }
+        }, 120);
+
+    }, true);
+
+    // Android / browser Back handling
+    window.addEventListener('popstate', function (event) {
+        const state = event.state;
+
+        if (
+            state &&
+            state.gvelBackNavigation &&
+            state.previousUI
+        ) {
+            restoreUIState(state.previousUI);
+        }
+    });
+
+    console.log('GVel Global Back Navigation initialized');
+
+})();
   </script>
 </body>
 </html>
