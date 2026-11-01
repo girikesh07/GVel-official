@@ -324,39 +324,24 @@ fetch('/festival')
         </div>
       </div>
 
-      <!-- Trust Banner & Search -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2 bg-gradient-to-br from-emerald-50 via-teal-50 to-white border border-emerald-100 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs">
-          <div>
-            <div class="inline-flex items-center gap-2 mb-3">
-              <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-xs tracking-wide">100% DIRECT BOOKINGS</span>
-              <span class="text-xs font-bold text-emerald-950">Zero Agent Commissions</span>
-            </div>
-            <h3 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">Explore Authentic India, <span class="text-emerald-600">On Your Budget.</span></h3>
-            <p class="text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">Direct train connections, verified highway dhabas, budget hostel stays, and direct booking links without any middlemen.</p>
+      
+            <!-- 1. FULL-WIDTH TRUST & CREDIBILITY HERO BANNER -->
+      <div class="bg-gradient-to-br from-emerald-50 via-teal-50 to-white border border-emerald-100 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs">
+        <div>
+          <div class="inline-flex items-center gap-2 mb-3">
+            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-xs tracking-wide">100% DIRECT BOOKINGS</span>
+            <span class="text-xs font-bold text-emerald-950">Zero Agent Commissions</span>
           </div>
-          <div class="grid grid-cols-3 gap-3 mt-6 pt-4 border-t border-emerald-200/60 text-center">
-            <div><div class="text-lg sm:text-xl font-black text-slate-900">4.9 ★</div><div class="text-xs font-semibold text-slate-500">Play Store</div></div>
-            <div><div class="text-lg sm:text-xl font-black text-emerald-600">50,000+</div><div class="text-xs font-semibold text-slate-500">Routes</div></div>
-            <div><div class="text-lg sm:text-xl font-black text-teal-600">₹0 Fee</div><div class="text-xs font-semibold text-slate-500">Direct Links</div></div>
-          </div>
+          <h3 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">Explore Authentic India, <span class="text-emerald-600">On Your Budget.</span></h3>
+          <p class="text-sm text-slate-600 mt-2 max-w-2xl leading-relaxed">Direct train connections, verified highway dhabas, budget hostel stays, and direct booking links without any middlemen.</p>
         </div>
-
-        <div class="bg-white border border-slate-200 rounded-3xl p-6 flex flex-col justify-between shadow-xs">
-          <div>
-            <h4 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">Instant Destination Search</h4>
-            <p class="text-xs text-slate-500 mb-4">Quickly filter any Indian city, cultural festival, or landmark.</p>
-            <div class="relative">
-              <i data-lucide="search" class="absolute left-4 top-3.5 w-4 h-4 text-slate-400"></i>
-              <input type="text" id="destinationSearch" onkeyup="window.filterDestinations()" placeholder="Search Pushkar, Spiti, Goa, Hampi..." class="w-full bg-slate-100 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-semibold outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition">
-            </div>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
-            <span>Showing Destinations:</span>
-            <span id="feedCount" class="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">12 places</span>
-          </div>
+        <div class="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-emerald-200/60 text-center max-w-xl">
+          <div><div class="text-lg sm:text-2xl font-black text-slate-900">4.9 ★</div><div class="text-xs font-semibold text-slate-500">Play Store</div></div>
+          <div><div class="text-lg sm:text-2xl font-black text-emerald-600">50,000+</div><div class="text-xs font-semibold text-slate-500">Routes</div></div>
+          <div><div class="text-lg sm:text-2xl font-black text-teal-600">₹0 Fee</div><div class="text-xs font-semibold text-slate-500">Direct Links</div></div>
         </div>
       </div>
+
 
       <!-- WHERE TO START & WHERE TO GO ROUTE ENGINE -->
       <div class="bg-white border border-emerald-200 rounded-3xl p-5 sm:p-7 shadow-sm">
@@ -623,13 +608,33 @@ fetch('/festival')
         </div>
       </div>
 
-      <!-- Feed Grid -->
-      <div>
-        <div class="flex items-center justify-between mb-4 px-1">
-          <h4 class="text-lg font-black text-slate-900 flex items-center gap-2">
-            <i data-lucide="compass" class="w-5 h-5 text-emerald-600"></i> Explore 20+ Cultural Circuits
-          </h4>
+            <!-- 4. FEED WITH INTEGRATED SEARCH BOX DIRECTLY ON TOP -->
+      <div class="space-y-4 pt-2">
+        <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 class="text-lg font-black text-slate-900 flex items-center gap-2">
+              <i data-lucide="compass" class="w-5 h-5 text-emerald-600"></i> Explore Curated Circuits
+            </h4>
+            <p class="text-xs text-slate-500 mt-0.5">Filter destinations, festival circuits and hill stations in real time</p>
+          </div>
+
+          <!-- The Search Box Directly Connected to Feed -->
+          <div class="relative w-full sm:w-80">
+            <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+            <input 
+              type="text" 
+              id="destinationSearch" 
+              oninput="window.filterDestinations()" 
+              placeholder="Search Pushkar, Spiti, Goa, Kashi..." 
+              class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-20 py-2.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition placeholder:text-slate-400"
+            />
+            <span id="feedCount" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              8 places
+            </span>
+          </div>
         </div>
+
+        <!-- The Live Feed Cards Grid -->
         <div id="destinationsFeedList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
       </div>
 
@@ -2984,6 +2989,7 @@ window.currentCalMonth = _calDate.getMonth();
 
       window.renderFeed();
       window.renderPlannerCityGrid(); // LOAD STEP 1 CARDS IMMEDIATELY
+      window.render2DCalendar();
       window.updateSavedCountBadge();
       window.renderFestivalCalendar();
       if (window.lucide) window.lucide.createIcons();
