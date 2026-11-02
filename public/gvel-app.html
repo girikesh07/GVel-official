@@ -85,29 +85,50 @@ fetch('/festival')
     }
   })
   .catch(err => console.error("Supabase load error:", err));
-      // Supabase Live Data Connection
-fetch('/festival')
-  .then(res => res.json())
-  .then(res => {
-    if (res.success && res.data && res.data.length > 0) {
-      window.DESTINATIONS = res.data.map(item => ({
-        id: item.id,
-        name: item.title || item.name || "Special Destination",
-        location: item.location || "India",
-        tag: item.date_window || "Festival Special",
-        tagColor: "bg-orange-500",
-        budget: "₹3,500 - ₹7,000",
-        category: "Festival & Culture",
-        desc: item.location || "",
-        image: item.image_url || "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=600"
-      }));
+          // ============================================================
+    // SUPABASE HIGHLIGHTS LIVE CONNECTION (STORY CIRCLES)
+    // ============================================================
+    fetch('/highlights')
+      .then(res => res.json())
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          window.LIVE_HIGHLIGHTS = res.data;
 
-      // Live Cards Refresh
-      if (typeof window.renderFeed === 'function') window.renderFeed();
-      if (typeof window.renderPlannerCityGrid === 'function') window.renderPlannerCityGrid();
-    }
-  })
-  .catch(err => console.error("Supabase load error:", err));
+          function renderStoryCircles() {
+            const container = document.getElementById('featuredStoriesCarousel');
+            if (!container) return false;
+
+            // Supabase highlights table se dynamic story circles
+            container.innerHTML = res.data.map((item, idx) => `
+              <div onclick="window.openStory(${idx})" class="flex flex-col items-center flex-shrink-0 cursor-pointer group">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full insta-ring flex items-center justify-center p-[2px] transition group-hover:scale-105">
+                  <img src="${item.image_url}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=200';" class="w-full h-full rounded-full object-cover border-2 border-white">
+                </div>
+                <span class="text-xs font-bold text-slate-700 mt-2 truncate max-w-[80px] text-center">${item.title}</span>
+              </div>
+            `).join('');
+            return true;
+          }
+
+          // Agar container pehle se DOM mein ho toh turant render karein, warna load hone par
+          if (!renderStoryCircles()) {
+            document.addEventListener('DOMContentLoaded', renderStoryCircles);
+          }
+
+          // Fullscreen Story modal dataset update
+          window.STORY_ITEMS = res.data.map(item => ({
+            id: item.id,
+            title: item.title,
+            sub: item.city || "India",
+            date: "Cultural Highlight",
+            img: item.image_url,
+            fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800",
+            caption: `${item.title} in ${item.city || 'India'}. Curated story from GVel expedition network.`
+          }));
+        }
+      })
+      .catch(err => console.error("Highlights load error:", err));
+
     // Guest Bypass
     window.bypassAuthAsGuest = function() {
       window.currentUser = { name: "Guest Traveler", contact: "Guest Mode" };
