@@ -129,6 +129,105 @@ fetch('/festival')
       })
       .catch(err => console.error("Highlights load error:", err));
 
+          // ============================================================
+    // 1. LIVE TRAVEL GEAR LOADER (SUPABASE)
+    // ============================================================
+    fetch('/gear')
+      .then(res => res.json())
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          window.gvelGearItems = res.data.map(item => ({
+            id: item.id,
+            category: item.category,
+            name: item.name,
+            spec: item.spec,
+            price: item.price,
+            mrp: item.mrp,
+            discount: item.discount,
+            rating: item.rating || "4.7 ★",
+            icon: item.icon || "shopping-bag",
+            iconBg: item.icon_bg || "bg-emerald-50 text-emerald-600",
+            link: item.affiliate_url
+          }));
+          if (window.renderGearProducts) {
+            window.renderGearProducts(window.gvelGearItems);
+          }
+        }
+      })
+      .catch(err => console.warn("Gear fetch error:", err));
+
+    // ============================================================
+    // 2. LIVE ROUTE ESSENTIALS LOADER (DHABAS, STAYS, SECRETS)
+    // ============================================================
+    fetch('/essentials')
+      .then(res => res.json())
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          window.LIVE_ROUTE_ESSENTIALS = res.data;
+          // Dynamically populate Dhabas and Stays if container is ready
+          const dhabaContainer = document.getElementById('roadContent-dhabas');
+          const dhabas = res.data.filter(e => e.category === 'dhabas');
+          if (dhabaContainer && dhabas.length > 0) {
+            dhabaContainer.innerHTML = dhabas.map(d => `
+              <div class="border border-slate-200 hover:border-emerald-500 bg-white rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black shrink-0">
+                    <i data-lucide="utensils" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h5 class="text-xs font-black text-slate-900">${d.name}</h5>
+                      <span class="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded">${d.badge}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-0.5">${d.description}</p>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+                  <div class="text-right">
+                    <span class="text-xs font-black text-emerald-600">${d.price_info || 'Avg ₹150'}</span>
+                    <span class="block text-[10px] text-slate-400">${d.rating_info || '⭐ 4.8'}</span>
+                  </div>
+                  <a href="${d.booking_url || '#'}" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-1">
+                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Locate 📍</span>
+                  </a>
+                </div>
+              </div>
+            `).join('');
+            if (window.lucide) window.lucide.createIcons();
+          }
+        }
+      })
+      .catch(err => console.warn("Essentials fetch error:", err));
+
+    // ============================================================
+    // 3. LIVE DESTINATIONS FEED LOADER (CURATED CIRCUITS)
+    // ============================================================
+    fetch('/destinations')
+      .then(res => res.json())
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          const liveDestinations = res.data.map(d => ({
+            id: d.id,
+            name: d.name || d.title,
+            location: d.location,
+            tag: d.tag || "Special Circuit",
+            tagColor: d.tag_color || "bg-emerald-600",
+            budget: d.budget || "₹3,500 - ₹6,500",
+            image: d.image_url,
+            fallback: "https://images.unsplash.com/photo-1561361513-2d000a50f0dc?w=800",
+            desc: d.description || d.location,
+            lat: d.lat || 25.3176,
+            lng: d.lng || 82.9739
+          }));
+          window.DESTINATIONS = liveDestinations;
+          if (window.renderFeed) window.renderFeed();
+          if (window.renderPlannerCityGrid) window.renderPlannerCityGrid();
+        }
+      })
+      .catch(err => console.warn("Destinations fetch error:", err));
+
+
     // Guest Bypass
     window.bypassAuthAsGuest = function() {
       window.currentUser = { name: "Guest Traveler", contact: "Guest Mode" };
