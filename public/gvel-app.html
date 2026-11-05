@@ -138,7 +138,7 @@ window.bypassAuthAsGuest = function () {
           // ============================================================
     // 1. LIVE TRAVEL GEAR LOADER (SUPABASE)
     // ============================================================
-    fetch('/gear')
+    fetch('/travel_gear')
       .then(res => res.json())
       .then(res => {
         if (res.data && res.data.length > 0) {
@@ -165,7 +165,7 @@ window.bypassAuthAsGuest = function () {
     // ============================================================
     // 2. LIVE ROUTE ESSENTIALS LOADER (DHABAS, STAYS, SECRETS)
     // ============================================================
-    fetch('/essentials')
+    fetch('/route_essentials')
       .then(res => res.json())
       .then(res => {
         if (res.data && res.data.length > 0) {
@@ -205,6 +205,18 @@ window.bypassAuthAsGuest = function () {
         }
       })
       .catch(err => console.warn("Essentials fetch error:", err));
+      // Supabase Live Connection: Booking Providers
+    fetch('/booking_providers')
+      .then(res => res.json())
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          window.BOOKING_PROVIDERS = res.data;
+          // Agar booking tab ka dynamic render function bana hai toh use update karega
+          if (typeof window.renderBookingProviders === 'function') window.renderBookingProviders();
+          if (typeof window.renderBookingLinks === 'function') window.renderBookingLinks();
+        }
+      })
+      .catch(err => console.error("Booking providers load error:", err));
 
     // ============================================================
     // 3. LIVE DESTINATIONS FEED LOADER (CURATED CIRCUITS)
