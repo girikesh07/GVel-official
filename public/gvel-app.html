@@ -15,7 +15,8 @@
   <!-- Leaflet Map CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+   <!-- Supabase JS Library CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; }
@@ -32,6 +33,13 @@
   </style>
 
   <script>
+ // Supabase Client Setup
+const SB_APP_URL = 'https://prvrhnpcpaqmvflpnxre.supabase.co';
+const SB_APP_KEY = 'sb_publishable_J5qRNImPpI8oEBuH7fKz5Q_vmGkeJBq'; // (Aapki poori publishable key)
+
+if (window.supabase) {
+  window.supabaseClient = window.supabase.createClient(SB_APP_URL, SB_APP_KEY);
+}
     // Global Application State
     window.currentUser = null;
     window.savedPlaces = ["varanasi", "pushkar", "goa"];
@@ -64,7 +72,7 @@
       { id: "manali", name: "Old Manali & Solang", location: "Himachal Pradesh", tag: "Mountains", tagColor: "bg-emerald-700", budget: "₹3,500 - ₹7,500", image: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&auto=format&fit=crop&q=80", fallback: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&auto=format&fit=crop&q=80", desc: "Pine forests, apple orchards, mountain river bridges, and riverside cafes.", lat: 32.2432, lng: 77.1892 }
     ];
       // Supabase Live Data Connection
-fetch('/festival')
+fetch('/festivals')
   .then(res => res.json())
   .then(res => {
     if ( res.data && res.data.length > 0) {
@@ -309,90 +317,251 @@ fetch('/festival')
       alert("Google Login Error: " + error.message);
     }
   };
+  // Modal Open / Close Functions (BuyHatke Style)
+function openAuthModal() {
+  const modal = document.getElementById('authScreen');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('authScreen');
+  if (modal) modal.classList.add('hidden');
+}
+window.bypassAuthAsGuest = closeAuthModal;
+
+// Tab switcher (Login vs Signup)
+function switchGvelAuth(mode) {
+  const loginSec = document.getElementById('loginSection');
+  const signupSec = document.getElementById('signupSection');
+  const otpSec = document.getElementById('otpSection');
+  const tabLogin = document.getElementById('tabBtnLogin');
+  const tabSignup = document.getElementById('tabBtnSignup');
+
+  if (otpSec) otpSec.classList.add('hidden');
+
+  if (mode === 'signup') {
+    if (loginSec) loginSec.classList.add('hidden');
+    if (signupSec) signupSec.classList.remove('hidden');
+    if (tabSignup) tabSignup.className = "flex-1 pb-2 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700";
+    if (tabLogin) tabLogin.className = "flex-1 pb-2 text-sm font-semibold text-gray-400 border-b-2 border-transparent";
+  } else {
+    if (signupSec) signupSec.classList.add('hidden');
+    if (loginSec) loginSec.classList.remove('hidden');
+    if (tabLogin) tabLogin.className = "flex-1 pb-2 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700";
+    if (tabSignup) tabSignup.className = "flex-1 pb-2 text-sm font-semibold text-gray-400 border-b-2 border-transparent";
+  }
+}
+
+// 1. SIGNUP & SEND FREE EMAIL OTP
+async function handleGvelSignup(e) {
+  if (e) e.preventDefault();
+
+  const name = document.getElementById('regName')?.value.trim();
+  const age = document.getElementById('regAge')?.value.trim();
+  const phone = document.getElementById('regPhone')?.value.trim();
+  const email = document.getElementById('regEmail')?.value.trim();
+  const password = document.getElementById('regPassword')?.value;
+
+  if (!name || !email || !password || !phone) {
+    alert("Please fill in all required fields (Full Name, Phone, Email, and Password).");
+    return;
+  }
+
+  const { data, error } = await window.supabaseClient.auth.signUp({
+    email: email,
+    password: password,
+    options: {
+      data: {
+        full_name: name,
+        age: parseInt(age) || null,
+        phone: "+91" + phone
+      }
+    }
+  });
+
+  if (error) {
+    alert("Signup Error: " + error.message);
+    return;
+  }
+
+  document.getElementById('signupSection')?.classList.add('hidden');
+  document.getElementById('otpSection')?.classList.remove('hidden');
+  const badge = document.getElementById('otpEmailBadge');
+  if (badge) badge.innerText = email;
+}
+
+// 2. VERIFY EMAIL OTP
+async function handleGvelVerifyOtp(e) {
+  if (e) e.preventDefault();
+
+  const email = document.getElementById('otpEmailBadge')?.innerText;
+  const token = document.getElementById('emailOtpValue')?.value.trim();
+
+  if (!token || token.length < 6) {
+    alert("Please enter a valid 6-digit verification code.");
+    return;
+  }
+
+  const { data, error } = await window.supabaseClient.auth.verifyOtp({
+    email: email,
+    token: token,
+    type: 'signup'
+  });
+
+  if (error) {
+    alert("Verification Failed: " + error.message);
+    return;
+  }
+
+  alert("Welcome to GVel! Your account has been verified successfully.");
+  closeAuthModal();
+  window.location.reload();
+}
+
+/// 3. LOGIN VIA EMAIL + PASSWORD
+async function handleGvelLogin(e) {
+  if (e) e.preventDefault();
+
+  const email = document.getElementById('loginEmail')?.value.trim();
+  const password = document.getElementById('loginPassword')?.value;
+
+  if (!email || !password) {
+    alert("Please enter both your email address and password.");
+    return;
+  }
+
+  const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if (error) {
+    alert("Login Failed: " + error.message);
+    return;
+  }
+
+  closeAuthModal();
+  window.location.reload();
+}
+
+
+// 4. FORGOT PASSWORD (EMAIL RESET)
+async function handleForgotPassword() {
+  const email = prompt("Apna registered Email ID enter karein:");
+  if (!email) return;
+
+  const { error } = await window.supabaseClient.auth.resetPasswordForEmail(email);
+  if (error) {
+    alert("Error: " + error.message);
+  } else {
+    alert("Password reset instructions aapke email par bhej diye gaye hain!");
+  }
+}
 </script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900 pb-20 md:pb-10">
 
-  <!-- ========================================== -->
-  <!-- 1. AUTHENTICATION POPUP                    -->
-  <!-- ========================================== -->
-  <div id="authScreen" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col justify-center items-center p-4 overflow-y-auto">
-    <div class="w-full max-w-sm sm:max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto">
-      <div class="text-center mb-6">
-        <div class="inline-block relative mb-3">
-          <img src="/gvel-logo-icon.png" alt="GVel mountain traveller logo" class="w-20 h-20 rounded-3xl object-cover shadow-xl border-2 border-amber-300 mx-auto">
-        </div>
-        <img src="/gvel-wordmark.png" alt="GVel — Every journey, one world" class="gvel-wordmark mx-auto">
-        <p class="text-xs font-semibold text-slate-500 tracking-wide uppercase mt-1">India's Smart Travel Network</p>
-      </div>
+  <!-- AUTH MODAL -->
+<div id="authScreen" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative border border-gray-100">
+    
+    <!-- Close / Guest Skip -->
+    <button onclick="window.bypassAuthAsGuest()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-sm font-semibold">
+      Skip ✕
+    </button>
 
-      <div class="flex border-b border-slate-200 mb-5">
-        <button type="button" id="authTabLogin" onclick="window.switchAuthMode('login')" class="flex-1 pb-3 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700">Log In</button>
-        <button type="button" id="authTabSignup" onclick="window.switchAuthMode('signup')" class="flex-1 pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600">Create Account</button>
-      </div>
+    <!-- Brand Logo -->
+    <div class="text-center mb-5">
+      <img src="gvel-wordmark.png" alt="GVel" class="h-9 mx-auto object-contain">
+      <p class="text-xs text-gray-500 font-medium mt-1">India's Smart Budget Travel Network</p>
+    </div>
 
-      <div class="flex justify-center gap-6 mb-4 text-xs font-semibold text-slate-500">
-        <label class="flex items-center gap-1.5 cursor-pointer text-emerald-700 font-bold">
-          <input type="radio" name="authMethod" checked onchange="window.toggleAuthInput('phone')" class="accent-emerald-600"> Mobile Number
-        </label>
-        <label class="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" name="authMethod" onchange="window.toggleAuthInput('email')" class="accent-emerald-600"> Email Address
-        </label>
-      </div>
-
-      <div id="phoneInputGroup" class="mb-4">
-        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Mobile Number</label>
-        <div class="flex gap-2">
-          <select id="countryCodeSelect" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500">
-            <option value="+91">IN +91</option>
-            <option value="+977">NP +977</option>
-            <option value="+971">UAE +971</option>
-            <option value="+1">US +1</option>
-          </select>
-          <input type="tel" id="authPhone" placeholder="98765 43210" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white" value="9876543210">
-        </div>
-      </div>
-
-      <div id="emailInputGroup" class="mb-4 hidden">
-        <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Email Address</label>
-        <input type="email" id="authEmail" placeholder="deepak@gvel.in" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white">
-      </div>
-
-      <div class="mb-5">
-        <div class="flex justify-between items-center mb-1">
-          <label class="block text-[11px] font-bold uppercase text-slate-500">Password</label>
-          <a href="javascript:void(0)" onclick="alert('Password reset link sent!')" class="text-[11px] font-semibold text-emerald-600 hover:underline">Forgot?</a>
-        </div>
-        <input type="password" id="authPass" placeholder="••••••••" value="gvel2026" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white">
-      </div>
-
-      <button type="button" onclick="window.handleAuthSubmit()" id="authSubmitBtn" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl shadow-md active:scale-98 transition text-sm">
-        LOG IN TO GVEL
+    <!-- Mode Tabs -->
+    <div class="flex border-b border-gray-200 mb-5">
+      <button id="tabBtnLogin" onclick="switchGvelAuth('login')" class="flex-1 pb-2 text-sm font-bold border-b-2 border-emerald-600 text-emerald-700">
+        Log In
       </button>
-
-      <div class="relative my-4">
-        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
-        <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400 font-bold tracking-wider">OR</span></div>
-      </div>
-<button
-  type="button"
-  id="googleLoginBtn"
-  onclick="window.signInWithGoogle()"
-  class="w-full py-3 mt-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-3 hover:bg-slate-50"
->
-  <img
-    src="https://www.google.com/favicon.ico"
-    class="w-5 h-5"
-    alt="Google"
-  />
-  Continue with Google
-</button>
-      <button type="button" onclick="window.bypassAuthAsGuest()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded-xl active:scale-98 transition text-xs flex items-center justify-center gap-2">
-        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i> Guest Quick Access (Direct Entry)
+      <button id="tabBtnSignup" onclick="switchGvelAuth('signup')" class="flex-1 pb-2 text-sm font-semibold text-gray-400 border-b-2 border-transparent">
+        Create Account
       </button>
     </div>
-  </div>
 
+    <!-- 1. LOGIN FORM -->
+    <div id="loginSection" class="space-y-3">
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 tracking-wider">EMAIL ADDRESS</label>
+        <input type="email" id="loginEmail" placeholder="name@example.com" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+      </div>
+      <div>
+        <div class="flex justify-between items-center">
+          <label class="text-[10px] font-bold text-gray-400 tracking-wider">PASSWORD</label>
+          <button type="button" onclick="handleForgotPassword()" class="text-[11px] text-emerald-600 font-semibold hover:underline">Forgot?</button>
+        </div>
+        <input type="password" id="loginPassword" placeholder="••••••••" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+      </div>
+      <button onclick="handleGvelLogin()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl text-sm transition">
+        LOG IN TO GVEL
+      </button>
+    </div>
+
+    <!-- 2. CREATE ACCOUNT FORM (Name + Age + Phone + Email) -->
+    <div id="signupSection" class="hidden space-y-3">
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 tracking-wider">FULL NAME</label>
+        <input type="text" id="regName" placeholder="ENTER FULL NAME" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+      </div>
+      
+      <div class="grid grid-cols-3 gap-2">
+        <div class="col-span-1">
+          <label class="text-[10px] font-bold text-gray-400 tracking-wider">AGE</label>
+          <input type="number" id="regAge" placeholder="21" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+        </div>
+        <div class="col-span-2">
+          <label class="text-[10px] font-bold text-gray-400 tracking-wider">PHONE (LEAD)</label>
+          <div class="flex">
+            <span class="inline-flex items-center px-2.5 text-xs bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl text-gray-600 font-semibold">+91</span>
+            <input type="tel" id="regPhone" placeholder="9876543210" class="w-full border border-gray-200 rounded-r-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 tracking-wider">EMAIL ADDRESS (FOR FREE OTP)</label>
+        <input type="email" id="regEmail" placeholder="name@example.com" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+      </div>
+
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 tracking-wider">CREATE PASSWORD</label>
+        <input type="password" id="regPassword" placeholder="Minimum 6 characters" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none">
+      </div>
+
+      <button onclick="handleGvelSignup()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl text-sm transition">
+        SEND EMAIL OTP & REGISTER
+      </button>
+    </div>
+
+    <!-- EMAIL SENT NOTICE SCREEN -->
+<div id="otpSection" class="hidden text-center space-y-4 py-4">
+  <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-2xl">
+    📬
+  </div>
+  <div>
+    <h4 class="font-bold text-gray-800 text-lg">Check Your Email</h4>
+    <p class="text-xs text-gray-500 mt-2 leading-relaxed">
+      We sent a confirmation link to <br>
+      <b id="otpEmailBadge" class="text-emerald-700 font-semibold"></b>
+    </p>
+    <p class="text-[11px] text-gray-400 mt-2">
+      Click the link in the email to activate your account, then log in.
+    </p>
+  </div>
+  <button onclick="switchGvelAuth('login')" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl text-sm transition">
+    PROCEED TO LOG IN
+  </button>
+</div>
+
+  </div>
+</div>
   <!-- ========================================== -->
   <!-- 2. STICKY TOP APP HEADER                   -->
   <!-- ========================================== -->
