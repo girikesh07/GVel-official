@@ -358,20 +358,26 @@
 
 
     // 1. GOOGLE LOGIN (Works on localhost + Vercel automatically)
-    window.signInWithGoogle = async function () {
-      if (!window.supabaseClient) {
-        alert("Supabase load nahi hua, page refresh karein.");
-        return;
+   window.signInWithGoogle = async function () {
+    if (!window.supabaseClient) {
+      alert("Supabase load nahi hua, page refresh karein.");
+      return;
+    }
+    const { data, error } = await window.supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+        skipBrowserRedirect: true
       }
-      const { error } = await window.supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin + window.location.pathname
-        }
-      });
-      if (error) alert("Google Login Error: " + error.message);
-    };
-
+    });
+    if (error) {
+      alert("Google Login Error: " + error.message);
+      return;
+    }
+    if (data?.url) {
+      window.top.location.href = data.url;
+    }
+  };
     // Modal Open / Close
     function openAuthModal() {
       document.getElementById('authScreen')?.classList.remove('hidden');
