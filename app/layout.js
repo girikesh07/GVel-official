@@ -4,6 +4,7 @@ export const metadata = {
   title: "GVel — Every Journey, One Platform",
   description:
     "Discover India's festivals, explore destinations, compare travel routes and plan a trip that fits your budget with GVel.",
+    manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }) {
