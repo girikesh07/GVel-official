@@ -212,7 +212,7 @@ fetch('/festivals')
       .then(res => res.json())
       .then(res => {
         if (res.data && res.data.length > 0) {
-          window.BOOKING_PROVIDERS = res.data;
+          window.live_BOOKING_PROVIDERS = res.data;
           // Agar booking tab ka dynamic render function bana hai toh use update karega
           if (typeof window.renderBookingProviders === 'function') window.renderBookingProviders();
           if (typeof window.renderBookingLinks === 'function') window.renderBookingLinks();
@@ -295,18 +295,12 @@ fetch('/festivals')
       document.getElementById('authScreen').classList.remove('hidden');
     };
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ 
   <script>
-  const SUPABASE_URL = "https://prvrhnpcpaqmvflpnxre.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_J5qRNImPpI8oEBuH7fKzQ_vmGkeJBq";
-
-  const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  
 
   window.signInWithGoogle = async function () {
-    const { error } = await supabaseClient.auth.signInWithOAuth({
+    const { error } = await window.supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: window.location.origin + "/gvel-app.html"
@@ -661,24 +655,7 @@ async function handleForgotPassword() {
       </div>
 
       
-            <!-- 1. FULL-WIDTH TRUST & CREDIBILITY HERO BANNER -->
-      <div class="bg-gradient-to-br from-emerald-50 via-teal-50 to-white border border-emerald-100 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs">
-        <div>
-          <div class="inline-flex items-center gap-2 mb-3">
-            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-xs tracking-wide">100% DIRECT BOOKINGS</span>
-            <span class="text-xs font-bold text-emerald-950">Zero Agent Commissions</span>
-          </div>
-          <h3 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">Explore Authentic India, <span class="text-emerald-600">On Your Budget.</span></h3>
-          <p class="text-sm text-slate-600 mt-2 max-w-2xl leading-relaxed">Direct train connections, verified highway dhabas, budget hostel stays, and direct booking links without any middlemen.</p>
-        </div>
-        <div class="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-emerald-200/60 text-center max-w-xl">
-          <div><div class="text-lg sm:text-2xl font-black text-slate-900">4.9 ★</div><div class="text-xs font-semibold text-slate-500">Play Store</div></div>
-          <div><div class="text-lg sm:text-2xl font-black text-emerald-600">50,000+</div><div class="text-xs font-semibold text-slate-500">Routes</div></div>
-          <div><div class="text-lg sm:text-2xl font-black text-teal-600">₹0 Fee</div><div class="text-xs font-semibold text-slate-500">Direct Links</div></div>
-        </div>
-      </div>
-
-
+            
       <!-- WHERE TO START & WHERE TO GO ROUTE ENGINE -->
       <div class="bg-white border border-emerald-200 rounded-3xl p-5 sm:p-7 shadow-sm">
         <div class="flex items-center gap-2 mb-4">
@@ -1586,16 +1563,7 @@ window.showCopySuccess = function(btn) {
   }, 1800);
 };
 
-// Initialize Store on Tab Switch
-const origSwitchTab = window.switchTab;
-window.switchTab = function(tabName) {
-  if (origSwitchTab) {
-    try { origSwitchTab(tabName); } catch(e) {}
-  }
-  if (tabName === 'shopping') {
-    window.renderGearProducts(window.gvelGearItems);
-  }
-};
+
 
 // Auto init on load
 document.addEventListener('DOMContentLoaded', () => {
@@ -2323,17 +2291,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          
-
-          <div class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
-            <div id="plannerSubTabsHeader" class="flex border-b border-slate-200 text-xs sm:text-sm font-bold"></div>
-            <div id="plannerSubTabContent" class="space-y-3"></div>
-          </div>
-        </div>
-      </div>
+        
     </div>
-    </div>
+    
   </main>
 
     <!-- ========================================== -->
@@ -2679,6 +2639,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tab === 'planner') {
         window.renderPlannerCityGrid();
       }
+      if (tab === 'shopping' && window.renderGearProducts) window.renderGearProducts(window.gvelGearItems);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -2780,7 +2741,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('plannerOriginBadge').innerText = window.plannerState.origin;
       }
       if (step === 4) {
-        window.renderPlannerStep4();
+        if (window.renderStep4ByTransportMode) window.renderStep4ByTransportMode(window.plannerState.transport);
       }
     };
 
@@ -3048,29 +3009,43 @@ window.currentCalMonth = _calDate.getMonth();
         grid.appendChild(emptyCell);
       }
 
+      const today = new Date();
+      const isCurrentMonth =
+        today.getMonth() === window.currentCalMonth &&
+        today.getFullYear() === window.currentCalYear;
+      const todayDate = today.getDate();
+
       // Populate month days
       for (let d = 1; d <= totalDays; d++) {
         const cell = document.createElement('div');
-        
+        const isToday = isCurrentMonth && d === todayDate;
+
         // Find if this day has an event
         const matchingEvent = Object.values(window.FESTIVAL_DETAILS).find(
           ev => ev.day === d && ev.month === window.currentCalMonth && ev.year === window.currentCalYear
         );
 
         if (matchingEvent) {
-          // Highlighted Green Active Festival Date
-          cell.className = "h-9 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 transition relative ring-2 ring-emerald-300";
+          // Festival Date (agar aaj hi festival hai toh bahar extra green outline dikhegi)
+          cell.className = `h-9 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-black text-xs sm:text-sm flex flex-col items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 transition relative ${
+            isToday ? 'ring-2 ring-emerald-600 ring-offset-2' : 'ring-2 ring-emerald-300'
+          }`;
           cell.innerHTML = `
             <span>${d}</span>
             <span class="w-1.5 h-1.5 rounded-full bg-amber-300 mt-0.5"></span>
           `;
           cell.onclick = () => window.selectCalendarFestival(matchingEvent.id);
+        } else if (isToday) {
+          // Aaj ki normal date (Live Green Outline)
+          cell.className = "h-9 sm:h-11 rounded-xl bg-emerald-50/50 border-2 border-emerald-600 text-emerald-700 font-black text-xs sm:text-sm flex items-center justify-center shadow-xs transition";
+          cell.innerHTML = `<span>${d}</span>`;
         } else {
           // Regular Day
           cell.className = "h-9 sm:h-11 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center transition";
           cell.innerHTML = `<span>${d}</span>`;
         }
 
+        if (isToday) cell.title = "Today";
         grid.appendChild(cell);
       }
     };
@@ -3327,7 +3302,7 @@ window.currentCalMonth = _calDate.getMonth();
       window.renderPlannerCityGrid(); // LOAD STEP 1 CARDS IMMEDIATELY
       window.render2DCalendar();
       window.updateSavedCountBadge();
-      window.renderFestivalCalendar();
+    
       if (window.lucide) window.lucide.createIcons();
     });
     // ========================================================
